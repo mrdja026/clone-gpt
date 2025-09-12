@@ -12,19 +12,31 @@
   },
   "scripts": {
     "dev": "vite",
+    "dev:server": "tsx watch server/main.ts",
     "build": "npm run build:client && npm run build:server",
     "build:client": "vite build",
     "build:server": "vite build --config vite.config.server.ts",
-    "start": "node dist/server/node-build.mjs",
+    "start": "node dist/server/production.mjs",
+    "start:dev": "tsx server/main.ts",
     "test": "vitest --run",
     "format.fix": "prettier --write .",
     "typecheck": "tsc"
   },
   "dependencies": {
     "@ai-sdk/openai": "^2.0.28",
+    "@nestjs/common": "^11.1.6",
+    "@nestjs/config": "^4.0.2",
+    "@nestjs/core": "^11.1.6",
+    "@nestjs/mapped-types": "^2.1.0",
+    "@nestjs/platform-express": "^11.1.6",
+    "@supabase/supabase-js": "^2.57.4",
     "ai": "^5.0.41",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.14.2",
     "dotenv": "^17.2.1",
     "express": "^5.1.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2",
     "zod": "^3.25.76"
   },
   "devDependencies": {

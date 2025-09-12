@@ -17,6 +17,10 @@
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
 
+    /* Decorator support for NestJS */
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+
     /* Linting */
     "strict": false,
     "noUnusedLocals": false,

@@ -32,6 +32,24 @@ export default defineConfig({
         // External dependencies that should not be bundled
         "express",
         "cors",
+        // NestJS dependencies
+        "@nestjs/core",
+        "@nestjs/common",
+        "@nestjs/platform-express",
+        "@nestjs/config",
+        "@nestjs/mapped-types",
+        "reflect-metadata",
+        "rxjs",
+        "class-transformer",
+        "class-validator",
+        // AI SDK
+        "ai",
+        "@ai-sdk/openai",
+        // Supabase
+        "@supabase/supabase-js",
+        // Other dependencies
+        "dotenv",
+        "zod",
       ],
       output: {
         format: "es",

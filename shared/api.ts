@@ -9,6 +9,7 @@
  */
 export interface DemoResponse {
   message: string;
+  timestamp?: string;
 }
 
 export interface ChatMessage {
@@ -28,4 +29,39 @@ export interface ChatResponse {
     completionTokens: number;
     totalTokens: number;
   };
+}
+
+export interface PersistentChatRequest extends ChatRequest {
+  chatId?: string;
+  userId?: string;
+  autoSave?: boolean;
+}
+
+export interface PersistentChatResponse extends ChatResponse {
+  chatId: string;
+}
+
+export interface DBMessage {
+  id: string;
+  chat_id: string;
+  content: string;
+  role: "user" | "assistant";
+  created_at: string;
+}
+
+export interface DBChat {
+  id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+  user_id: string | null;
+}
+
+export interface QueryTemplate {
+  id: string;
+  title: string;
+  template: string;
+  category: string;
+  created_at: string;
+  updated_at: string;
 }

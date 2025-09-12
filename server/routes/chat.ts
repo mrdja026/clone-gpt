@@ -1,6 +1,14 @@
 import { RequestHandler } from "express";
 import { streamText } from "ai";
-import { openai } from "@ai-sdk/openai";
+import { createOpenAI } from "@ai-sdk/openai";
+
+// Configure OpenAI-compatible provider (works with Ollama)
+const ollama = createOpenAI({
+  apiKey: process.env.OPENAI_API_KEY || "branko:latest",
+  baseURL: process.env.OPENAI_BASE_URL || "http://127.0.0.1:11434/v1",
+});
+
+const modelName = process.env.MODEL_NAME || "llama3.1:latest";
 
 export interface ChatMessage {
   role: "user" | "assistant";
@@ -35,7 +43,7 @@ export const handleChat: RequestHandler = async (req, res) => {
     res.setHeader("Connection", "keep-alive");
 
     const result = streamText({
-      model: openai("gpt-4o-mini"), // Using cost-effective model
+      model: ollama(modelName), // Using local Ollama model
       system:
         systemPrompt ||
         "You are a helpful assistant that provides detailed analysis and suggestions for project management queries.",
@@ -71,7 +79,7 @@ export const handleChatSync: RequestHandler = async (req, res) => {
     }
 
     const result = await streamText({
-      model: openai("gpt-4o-mini"),
+      model: ollama(modelName),
       system:
         systemPrompt ||
         "You are a helpful assistant that provides detailed analysis and suggestions for project management queries.",

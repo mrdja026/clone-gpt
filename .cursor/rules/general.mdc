@@ -33,6 +33,12 @@ alwaysApply: true
 - If not the component must be created there in a subfolder for that component
 - That componet must follwo the styleguide and be aware of the theme changes
 
+# MCP MUST BE USED
+
+- hello_world_mcp C:\Users\Mrdjan\Documents\workspace\hello_world_mpc must be used
+- contains the logic that creates barebones mcp C:\Users\Mrdjan\Documents\workspace\hello_world_mpc\src\server.js
+- packages are in C:\Users\Mrdjan\Documents\workspace\hello_world_mpc\package.json
+
 # RULES DO NOT DEVIATE FROM THIS
 
 - Do not read .env files
