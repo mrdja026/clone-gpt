@@ -29,9 +29,15 @@ export function ChatArea({ conversation, siblingConversations, onSend, onBranchF
     if (initialPrompt !== undefined) setInput(initialPrompt);
   }, [initialPrompt]);
 
-  const tabs = useMemo(() =>
-    siblingConversations.map((c, i) => ({ id: c.id, label: c.title || `Branch ${i + 1}` })),
-  [siblingConversations]);
+  const groupHeadId = conversation.groupId ?? conversation.id;
+  const base = useMemo(() => siblingConversations.find((c) => c.id === groupHeadId) || conversation, [siblingConversations, groupHeadId, conversation]);
+  const branches = useMemo(() => siblingConversations.filter((c) => c.id !== groupHeadId), [siblingConversations, groupHeadId]);
+
+  const tabs = useMemo(() => {
+    if (branches.length === 0) return [] as { id: string; label: string }[];
+    const branchTabs = branches.map((c, i) => ({ id: c.id, label: `B${i + 1}` }));
+    return [{ id: base.id, label: "Original" }, ...branchTabs];
+  }, [branches, base.id]);
 
   const handleSend = async () => {
     const text = input.trim();
@@ -47,9 +53,10 @@ export function ChatArea({ conversation, siblingConversations, onSend, onBranchF
 
   return (
     <section className="flex-1 flex flex-col">
-      {tabs.length > 1 && (
+      {tabs.length > 0 && (
         <div className="border-b bg-card">
-          <TabBar tabs={tabs} activeId={conversation.id} onChange={onSwitchConversation} onClose={onCloseConversation} />
+          <div className="px-4 pt-2 text-xs text-muted-foreground">{base.title}</div>
+          <TabBar tabs={tabs} activeId={conversation.id} onChange={onSwitchConversation} onClose={(id)=> id===base.id? undefined : onCloseConversation(id)} />
         </div>
       )}
       <ScrollArea className="flex-1">
@@ -60,7 +67,7 @@ export function ChatArea({ conversation, siblingConversations, onSend, onBranchF
             </div>
           )}
           {conversation.messages.map((m) => (
-            <MessageBubble key={m.id} message={m} onBranch={() => onBranchFrom(m.id)} />
+            <MessageBubble key={m.id} message={m} onBranch={() => onBranchFrom(m.id)} allowBranch={!conversation.groupId} />
           ))}
           <div ref={bottomRef} />
         </div>
@@ -88,7 +95,7 @@ export function ChatArea({ conversation, siblingConversations, onSend, onBranchF
   );
 }
 
-function MessageBubble({ message, onBranch }: { message: Message; onBranch: () => void }) {
+function MessageBubble({ message, onBranch, allowBranch }: { message: Message; onBranch: () => void; allowBranch: boolean }) {
   const isUser = message.role === "user";
   return (
     <div className={isUser ? "flex justify-end" : "flex justify-start"}>
@@ -97,7 +104,7 @@ function MessageBubble({ message, onBranch }: { message: Message; onBranch: () =
         " max-w-[80%] rounded-lg px-4 py-3 shadow-sm"
       }>
         <div className="whitespace-pre-wrap text-sm leading-relaxed">{message.content}</div>
-        {!isUser && (
+        {!isUser && allowBranch && (
           <div className="mt-2 text-xs text-muted-foreground flex items-center gap-2">
             <button className="inline-flex items-center gap-1 hover:underline" onClick={onBranch}>
               <GitBranch className="h-3.5 w-3.5" /> Branch
