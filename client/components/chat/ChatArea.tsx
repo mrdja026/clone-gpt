@@ -25,6 +25,10 @@ export function ChatArea({ conversation, siblingConversations, onSend, onBranchF
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [conversation.messages.length]);
 
+  useEffect(() => {
+    if (initialPrompt !== undefined) setInput(initialPrompt);
+  }, [initialPrompt]);
+
   const tabs = useMemo(() =>
     siblingConversations.map((c, i) => ({ id: c.id, label: c.title || `Branch ${i + 1}` })),
   [siblingConversations]);
