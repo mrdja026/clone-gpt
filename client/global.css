@@ -12,44 +12,44 @@
    * A different format will require also updating the theme in tailwind.config.ts.
   */
   :root {
-    /* Jira light theme */
-    --background: 220 16% 96%; /* N20 */
-    --foreground: 216 45% 20%; /* N800 */
+    /* UX-first complementary light theme: orange primary complementing Jira blue accent */
+    --background: 210 20% 98%;
+    --foreground: 220 25% 15%;
 
     --card: 0 0% 100%;
-    --card-foreground: 216 45% 20%;
+    --card-foreground: 220 25% 15%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 216 45% 20%;
+    --popover-foreground: 220 25% 15%;
 
-    --primary: 213 100% 40%; /* Jira Blue 500 #0052CC */
+    --primary: 34 100% 50%; /* Orange 500 #FF8B00 */
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 220 17% 94%; /* N30 */
-    --secondary-foreground: 216 45% 20%;
+    --secondary: 210 17% 95%;
+    --secondary-foreground: 220 25% 15%;
 
-    --muted: 220 17% 94%;
-    --muted-foreground: 213 17% 45%; /* N200 */
+    --muted: 210 17% 95%;
+    --muted-foreground: 215 16% 42%;
 
-    --accent: 212 100% 56%; /* Blue 400 #2684FF */
+    --accent: 212 100% 56%; /* Jira Blue 400 #2684FF */
     --accent-foreground: 0 0% 100%;
 
-    --destructive: 14 100% 60%; /* Red 500 #FF5630 */
+    --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 220 14% 86%; /* N40 */
-    --input: 220 14% 86%;
+    --border: 214 17% 88%;
+    --input: 214 17% 88%;
     --ring: 212 100% 56%;
 
     --radius: 0.75rem;
 
-    --sidebar-background: 210 20% 98%; /* N10 */
-    --sidebar-foreground: 216 45% 20%;
-    --sidebar-primary: 213 100% 40%;
+    --sidebar-background: 210 20% 98%;
+    --sidebar-foreground: 220 25% 15%;
+    --sidebar-primary: 34 100% 50%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 17% 94%;
-    --sidebar-accent-foreground: 216 45% 20%;
-    --sidebar-border: 220 14% 86%;
+    --sidebar-accent: 210 17% 95%;
+    --sidebar-accent-foreground: 220 25% 15%;
+    --sidebar-border: 214 17% 88%;
     --sidebar-ring: 212 100% 56%;
   }
 
