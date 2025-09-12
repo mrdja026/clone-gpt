@@ -3,43 +3,12 @@ import { Button } from "@/components/ui/button";
 import { RightSidebar } from "@/components/chat/RightSidebar";
 import { ChatArea } from "@/components/chat/ChatArea";
 import type { Conversation, Message } from "@/components/chat/types";
-import type { QueryTemplate } from "@/components/chat/types";
 import { cn } from "@/lib/utils";
 import { Moon, SunMedium } from "lucide-react";
 import { matchQuery, formatMCPResponse } from "@/lib/query-matcher";
 import { mcpClient } from "@/lib/mcp-client";
 
-const deterministicQueries: QueryTemplate[] = [
-  {
-    id: "q1",
-    label: "Get Jira issue ABC-123 details",
-    template:
-      "Show details for issue ABC-123 including status, assignee, and blockers.",
-  },
-  {
-    id: "q2",
-    label: "List my issues by priority",
-    template: "List all issues assigned to me ordered by priority with links.",
-  },
-  {
-    id: "q3",
-    label: "Release notes for vX.Y.Z",
-    template:
-      "Generate concise release notes for version v1.2.3 from merged tickets.",
-  },
-  {
-    id: "q4",
-    label: "Find blockers for EPIC-1",
-    template:
-      "What are the current blockers for epic EPIC-1 and action items to unblock?",
-  },
-  {
-    id: "q5",
-    label: "Sprint plan for TEAM A",
-    template:
-      "Create a 2-week sprint plan for team TEAM-A targeting 30 story points based on backlog.",
-  },
-];
+import { deterministicQueries } from "@/lib/queries";
 
 function uid(prefix = "id") {
   return `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
@@ -499,7 +468,7 @@ export default function Index() {
   return (
     <div className="min-h-screen grid grid-rows-[auto,1fr]">
       <header className="border-b bg-card">
-        <div className="container mx-auto flex items-center justify-between py-3">
+        <div className="container mx-auto flex items-center justify-between py-3 px-4">
           <div className="flex items-center gap-3">
             <div className="h-7 w-7 rounded-md bg-primary" />
             <div>
@@ -526,32 +495,36 @@ export default function Index() {
         </div>
       </header>
 
-      <main
-        className={cn(
-          "grid",
-          "grid-cols-1 lg:grid-cols-[1fr,20rem]",
-          "min-h-0",
-        )}
-      >
-        <div className="min-h-0 flex flex-col">
-          <ChatArea
-            conversation={active}
-            siblingConversations={siblings}
-            onSend={onSend}
+      <main className="py-4">
+        <div
+          className={cn(
+            "container mx-auto px-4",
+            "grid",
+            "grid-cols-1 lg:grid-cols-[1fr,20rem]",
+            "min-h-0",
+            "gap-4",
+          )}
+        >
+          <div className="min-h-0 flex flex-col">
+            <ChatArea
+              conversation={active}
+              siblingConversations={siblings}
+              onSend={onSend}
             onBranchFrom={onBranchFrom}
             onSwitchConversation={onSwitchConversation}
             onCloseConversation={onCloseConversation}
             initialPrompt={pendingPrompt}
           />
         </div>
-        <RightSidebar
-          className="min-h-0"
-          queries={deterministicQueries}
-          onUseQuery={(t) => setPendingPrompt(t)}
-          history={history}
-          onOpenConversation={openConversation}
-          onNewChat={newChat}
-        />
+          <RightSidebar
+            className="min-h-0"
+            queries={deterministicQueries}
+            onUseQuery={(t) => setPendingPrompt(t)}
+            history={history}
+            onOpenConversation={openConversation}
+            onNewChat={newChat}
+          />
+        </div>
       </main>
     </div>
   );
