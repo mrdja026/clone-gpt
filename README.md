@@ -123,6 +123,28 @@ shared/                   # Shared types between client/server
 └── api.ts              # API interfaces and types
 ```
 
+## Routing Overview
+
+- `/` – Post‑login onboarding page (hero, lookahead search, rounded chat)
+- `/chat` – Full chat workspace (branches, history, right sidebar queries)
+
+The onboarding page lets you try a prompt and see a streaming response. After the first answer arrives, you are automatically redirected to `/chat`, and the session appears alongside your other conversations.
+
+## Post‑Login Onboarding Page
+
+- Hero section with a relaxed SaaS tone and a quick CTA to “Open Full Chat”.
+- Lookahead search over deterministic queries (local today, DB-ready):
+  - Uses `client/components/ui/command`.
+  - Keyboard shortcut: Cmd/Ctrl+K to focus the search.
+- Rounded chat preview powered by the same `ChatArea` as the main workspace to preserve visual consistency.
+- On first streamed response, the conversation is saved and you are redirected to `/chat`.
+
+Key files:
+- `client/pages/PostLogin.tsx` – onboarding page (hero + search + chat)
+- `client/components/QuerySearch.tsx` – lookahead search component
+- `client/lib/queries.ts` – shared deterministic query templates
+- `client/pages/Index.tsx` – full chat workspace
+
 ## API Endpoints
 
 - `GET /api/ping` - Health check
