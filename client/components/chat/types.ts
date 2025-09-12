@@ -12,6 +12,7 @@ export interface Conversation {
   title: string;
   messages: Message[];
   groupId?: string; // Conversations that share the same groupId appear as tabs (branches)
+  parentId?: string; // For branch lineage; first-level branches have parentId === root id
   createdAt: number;
 }
 
