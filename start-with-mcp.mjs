@@ -18,9 +18,15 @@ const __dirname = path.dirname(__filename);
 // Load env variables
 dotenv.config();
 
+// Check if we should use the test MCP server
+const useTestMcp = process.env.USE_TEST_MCP === "true";
+
 // Paths with proper error checking
 const MCP_SERVER_DIR = path.resolve(__dirname, "../hello_world_mpc/src");
-const MCP_SERVER_PATH = path.resolve(MCP_SERVER_DIR, "server.js");
+// Use test-tools.js if USE_TEST_MCP is set to 'true'
+const MCP_SERVER_PATH = useTestMcp
+  ? path.resolve(__dirname, "../hello_world_mpc/test-tools.js")
+  : path.resolve(MCP_SERVER_DIR, "server.js");
 const MCP_ENV_PATH = path.resolve(__dirname, "../hello_world_mpc/.env");
 const MCP_LOGS_DIR = path.resolve(__dirname, "../hello_world_mpc/logs");
 
@@ -38,6 +44,7 @@ if (!fs.existsSync(MCP_LOGS_DIR)) {
 console.log("MCP Server Path:", MCP_SERVER_PATH);
 console.log("MCP Env Path:", MCP_ENV_PATH);
 console.log("MCP Logs Dir:", MCP_LOGS_DIR);
+console.log("Using Test MCP Server:", useTestMcp ? "YES" : "NO");
 
 // Check if MCP server exists
 if (!fs.existsSync(MCP_SERVER_PATH)) {
@@ -126,6 +133,8 @@ try {
         (mcpEnvVars && mcpEnvVars.JIRA_API_TOKEN) ||
         process.env.JIRA_API_TOKEN ||
         apiToken,
+      // Signal this is the test server
+      USE_TEST_MCP: useTestMcp ? "true" : "false",
     },
     cwd: path.dirname(MCP_SERVER_PATH), // Run from the MCP server directory
   });
@@ -164,6 +173,7 @@ try {
       !!(mcpEnvVars && mcpEnvVars.JIRA_API_TOKEN) ||
       !!process.env.JIRA_API_TOKEN ||
       !!apiToken,
+    USE_TEST_MCP: useTestMcp,
   });
 } catch (error) {
   console.error(`Failed to start MCP server: ${error.message}`);

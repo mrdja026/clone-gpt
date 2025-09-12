@@ -27,10 +27,24 @@ function extractJiraKeys(text: string): string[] {
 }
 
 /**
- * Extract ticket ID when "Ticket" is mentioned (case insensitive)
- * Looks for patterns like "Ticket SCRUM-8", "ticket ABC-123", etc.
+ * Extract ticket ID when "Ticket" is mentioned (case insensitive) or "Status-TICKET-123"/"RealStatus-TICKET-123" format is used
+ * Looks for patterns like "Ticket SCRUM-8", "ticket ABC-123", "Status-SCRUM-8", or "RealStatus-SCRUM-8", etc.
  */
 function extractTicketIds(text: string): string[] {
+  // First check for Status-TICKET-123 or RealStatus-TICKET-123 format (new pattern)
+  const statusPattern = /\b(Status|RealStatus)-([A-Z][A-Z0-9]+-\d+)\b/g;
+  const statusMatches = text.match(statusPattern);
+  if (statusMatches && statusMatches.length > 0) {
+    return statusMatches
+      .map((match) => {
+        // Extract just the ticket ID portion regardless of prefix
+        const ticketMatch = match.match(/-(([A-Z][A-Z0-9]+)-\d+)$/);
+        return ticketMatch ? ticketMatch[1] : "";
+      })
+      .filter((id) => id); // Filter out any empty strings
+  }
+
+  // Then check for "ticket TICKET-123" format (original pattern)
   const ticketPattern = /\bticket\s+([A-Z][A-Z0-9]+-\d+)\b/gi;
   const matches = [];
   let match;
@@ -78,22 +92,45 @@ export function matchQuery(userInput: string): QueryMatch {
   const input = userInput.toLowerCase().trim();
   const originalInput = userInput.trim();
 
-  // Pattern 1: Ticket-specific queries - uses "Ticket" keyword to extract ID
-  if (input.includes("ticket")) {
+  // Pattern 1: Ticket-specific queries - uses "Ticket" keyword or Status-TICKET/RealStatus-TICKET pattern to extract ID
+  if (
+    input.includes("ticket") ||
+    input.includes("status-") ||
+    input.includes("realstatus-")
+  ) {
     const ticketIds = extractTicketIds(originalInput);
     if (ticketIds.length > 0) {
-      return {
-        isMatch: true,
-        confidence: 0.95,
-        originalQuery: userInput,
-        mcpActions: ticketIds.map((ticketKey) => ({
-          toolName: "fetch_jira_ticket",
-          args: { ticketKey },
-          description: `Fetching details for JIRA ticket ${ticketKey}`,
-          type: "tool",
-        })),
-        enhancedPrompt: `You are in strict analysis mode. Only use the 'Retrieved Data' below that comes from the MCP JIRA tool. If no data is present, reply: "No JIRA data found for ${ticketIds[0]}". Do not infer or hallucinate.`,
-      };
+      // Use process_text tool if query includes Status-TICKET or RealStatus-TICKET pattern
+      if (originalInput.match(/\b(Status|RealStatus)-([A-Z][A-Z0-9]+-\d+)\b/)) {
+        return {
+          isMatch: true,
+          confidence: 0.99,
+          originalQuery: userInput,
+          mcpActions: [
+            {
+              toolName: "process_text",
+              args: { text: originalInput },
+              description: `Processing text command for ticket ${ticketIds[0]}`,
+              type: "tool",
+            },
+          ],
+          enhancedPrompt: `You are in strict analysis mode. Only use the 'Retrieved Data' below that comes from the MCP JIRA tool. If no data is present, reply: "No JIRA data found for ${ticketIds[0]}". Do not infer or hallucinate.`,
+        };
+      } else {
+        // Use traditional fetch_jira_ticket for other patterns
+        return {
+          isMatch: true,
+          confidence: 0.95,
+          originalQuery: userInput,
+          mcpActions: ticketIds.map((ticketKey) => ({
+            toolName: "fetch_jira_ticket",
+            args: { ticketKey },
+            description: `Fetching details for JIRA ticket ${ticketKey}`,
+            type: "tool",
+          })),
+          enhancedPrompt: `You are in strict analysis mode. Only use the 'Retrieved Data' below that comes from the MCP JIRA tool. If no data is present, reply: "No JIRA data found for ${ticketIds[0]}". Do not infer or hallucinate.`,
+        };
+      }
     }
   }
 
@@ -177,18 +214,37 @@ export function matchQuery(userInput: string): QueryMatch {
   if (input.includes("issue") || input.includes("task")) {
     const jiraKeys = extractJiraKeys(originalInput);
     if (jiraKeys.length > 0) {
-      return {
-        isMatch: true,
-        confidence: 0.85,
-        originalQuery: userInput,
-        mcpActions: jiraKeys.map((ticketKey) => ({
-          toolName: "fetch_jira_ticket",
-          args: { ticketKey },
-          description: `Fetching details for JIRA ticket ${ticketKey}`,
-          type: "tool",
-        })),
-        enhancedPrompt: `You are in strict analysis mode. Only use the 'Retrieved Data' from MCP JIRA to answer. If it is empty or an error, state that no data was retrieved for ${jiraKeys[0]} and stop. Do not hallucinate.`,
-      };
+      // Use process_text tool if query includes Status-TICKET or RealStatus-TICKET pattern
+      if (originalInput.match(/\b(Status|RealStatus)-([A-Z][A-Z0-9]+-\d+)\b/)) {
+        return {
+          isMatch: true,
+          confidence: 0.99,
+          originalQuery: userInput,
+          mcpActions: [
+            {
+              toolName: "process_text",
+              args: { text: originalInput },
+              description: `Processing text command for ticket ${jiraKeys[0]}`,
+              type: "tool",
+            },
+          ],
+          enhancedPrompt: `You are in strict analysis mode. Only use the 'Retrieved Data' from MCP JIRA to answer. If it is empty or an error, state that no data was retrieved for ${jiraKeys[0]} and stop. Do not hallucinate.`,
+        };
+      } else {
+        // Use traditional fetch_jira_ticket for other patterns
+        return {
+          isMatch: true,
+          confidence: 0.85,
+          originalQuery: userInput,
+          mcpActions: jiraKeys.map((ticketKey) => ({
+            toolName: "fetch_jira_ticket",
+            args: { ticketKey },
+            description: `Fetching details for JIRA ticket ${ticketKey}`,
+            type: "tool",
+          })),
+          enhancedPrompt: `You are in strict analysis mode. Only use the 'Retrieved Data' from MCP JIRA to answer. If it is empty or an error, state that no data was retrieved for ${jiraKeys[0]} and stop. Do not hallucinate.`,
+        };
+      }
     } else {
       // General issue query - show projects to help find issues
       return {
@@ -251,6 +307,31 @@ export function matchQuery(userInput: string): QueryMatch {
     }
   }
 
+  // Pattern 7: Direct Status-TICKET-X or RealStatus-TICKET-X command (highest priority)
+  const statusMatch = originalInput.match(
+    /\b(Status|RealStatus)-([A-Z][A-Z0-9]+-\d+)\b/,
+  );
+  if (statusMatch) {
+    const prefix = statusMatch[1]; // Status or RealStatus
+    const ticketKey = statusMatch[2]; // Extract the ticket key part
+    const isRealStatus = prefix.toLowerCase() === "realstatus";
+
+    return {
+      isMatch: true,
+      confidence: 1.0, // Highest confidence
+      originalQuery: userInput,
+      mcpActions: [
+        {
+          toolName: "process_text",
+          args: { text: originalInput },
+          description: `Processing ${isRealStatus ? "live " : ""}status command for ticket ${ticketKey}`,
+          type: "tool",
+        },
+      ],
+      enhancedPrompt: `You are in strict analysis mode. Only analyze the JIRA ticket data returned by the MCP server for ${ticketKey}. ${isRealStatus ? "This is live data from the API." : ""} Provide a clear summary of its status and details.`,
+    };
+  }
+
   // No match found
   return {
     isMatch: false,
@@ -271,7 +352,15 @@ export function formatMCPResponse(action: MCPAction, response: any): string {
     const identifier = action.toolName || action.resourceUri;
 
     switch (identifier) {
+      case "process_text": // dumbing down the process @mrdjanstajic
       case "fetch_jira_ticket":
+        // Handle error case first
+        if (data.error || data.status === "error") {
+          return `⚠️ **Error:** ${data.error || "Unknown error"}
+📝 **Details:** ${data.message || "No additional details available."}
+`;
+        }
+        // Normal response
         return `**JIRA Ticket: ${data.key}**
 📋 **Summary:** ${data.summary}
 📊 **Status:** ${data.status}
