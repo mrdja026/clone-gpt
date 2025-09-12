@@ -1,6 +1,7 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Inject } from "@nestjs/common";
 import axios from "axios";
 import path from "path";
+import { fileURLToPath } from "url";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { ConfigService } from "@nestjs/config";
@@ -13,7 +14,13 @@ export class McpService {
     expiresAt: 0,
   };
 
-  constructor(private configService: ConfigService) {}
+  constructor(@Inject(ConfigService) private configService: ConfigService) {}
+
+  // ESM-compatible __dirname
+  private getCurrentDirname() {
+    const __filename = fileURLToPath(import.meta.url);
+    return path.dirname(__filename);
+  }
 
   private getMcpBaseUrl() {
     return (
@@ -25,7 +32,7 @@ export class McpService {
     if (this.client) return this.client;
     const nodeExecutable = process.platform === "win32" ? "node.exe" : "node";
     const mcpServerPath = path.resolve(
-      __dirname,
+      this.getCurrentDirname(),
       "../../../hello_world_mpc/src/server.js",
     );
     const env = {

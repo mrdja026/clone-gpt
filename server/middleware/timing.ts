@@ -12,10 +12,12 @@ export function measureMcpLatency(
   const start = process.hrtime.bigint();
   const sloMs = 60_000; // 60s
 
+  let doneCalled = false;
   function done() {
+    if (doneCalled) return;
+    doneCalled = true;
     const end = process.hrtime.bigint();
     const durationMs = Number(end - start) / 1_000_000;
-    res.setHeader("X-Response-Time-ms", durationMs.toFixed(1));
 
     if (durationMs > sloMs) {
       // eslint-disable-next-line no-console
