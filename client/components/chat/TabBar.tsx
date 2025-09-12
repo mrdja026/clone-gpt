@@ -1,7 +1,8 @@
+import React from "react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { X } from "lucide-react";
 
-interface TabInfo { id: string; label: string; closable?: boolean }
+interface TabInfo { id: string; label: React.ReactNode; closable?: boolean }
 
 interface TabBarProps {
   tabs: TabInfo[];
