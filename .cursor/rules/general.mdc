@@ -34,6 +34,8 @@ alwaysApply: true
 - If not the component must be created there in a subfolder for that component
 - That componet must follwo the styleguide and be aware of the theme changes
 
+# IGNORE C:\Users\Mrdjan\Documents\workspace\clone-gpt\hello_world_mcp project
+
 # MCP MUST BE USED
 
 - MPC USES STDIO COMMUNICATION AND JSONRPC2 to get send data
