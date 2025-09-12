@@ -1,6 +1,7 @@
 Here’s what’s going wrong with the MCP + Jira integration based on the codebase.
 
 **Critical Breaks**
+
 - Wrong MCP server path
   - `server/routes/mcp.ts` and `start-with-mcp.(js|mjs)` point to `hello_world_mpc/src/server.js`.
   - The repo only has `hello_world_mcp/` and no `src/server.js` at all. So the MCP client attempts to spawn a non‑existent server and all `/api/mcp/*` calls fail.
@@ -19,12 +20,14 @@ Here’s what’s going wrong with the MCP + Jira integration based on the codeb
   - There’s also a Nest `McpService`/controller, but `server/index.ts` uses the Express route handlers (`server/routes/mcp.ts`). The Nest code isn’t in play, which can mislead expectations.
 
 **Secondary Issues**
+
 - MCP env location mismatch
   - The code tries to load `hello_world_mpc/.env`. The folder here is `hello_world_mcp/`. You do have Jira env in the root `.env`, but the MCP script’s .env is missing and the path is wrong.
 - UX expectation vs data flow
   - The client `mcpClient` assumes `/api/mcp` endpoints work, but with the server path broken they return 500s. `formatMCPResponse` expects tool/resource responses in specific shapes that you won’t get till a real MCP server answers.
 
 **What to change (minimal viable path)**
+
 - Fix paths to the MCP server
   - Replace all `hello_world_mpc` with `hello_world_mcp`.
   - Provide an MCP server at `hello_world_mcp/src/server.js` that registers:
@@ -44,6 +47,7 @@ Here’s what’s going wrong with the MCP + Jira integration based on the codeb
   - Either wire the Nest MCP controller in `server/main.ts` and use that, or remove it to avoid confusion. Currently, only `server/routes/mcp.ts` is active.
 
 If you want, I can:
+
 - Patch the paths and implement a minimal MCP server in `hello_world_mcp/src/server.js` with the two endpoints (tool + resource) using Jira basic auth.
 - Update the matcher to accept bare IDs and encode project key in the resource URI (or switch to a project tool).
 - Add a simple smoke flow in the client to show tool/resource availability and clearer errors if MCP isn’t reachable.

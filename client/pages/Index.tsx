@@ -511,7 +511,7 @@ export default function Index() {
       <main className="py-4">
         <div
           className={cn(
-            "container mx-auto px-4",
+            "mx-auto w-full max-w-[1500px] px-6",
             "grid",
             "grid-cols-1 lg:grid-cols-[1fr,20rem]",
             "min-h-0",
