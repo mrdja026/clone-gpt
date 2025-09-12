@@ -74,7 +74,7 @@ export function ChatArea({ conversation, siblingConversations, onSend, onBranchF
             </div>
           )}
           {conversation.messages.map((m) => (
-            <MessageBubble key={m.id} message={m} onBranch={() => onBranchFrom(m.id)} allowBranch={!conversation.groupId} />
+            <MessageBubble key={m.id} message={m} onBranch={() => onBranchFrom(m.id)} allowBranch={true} />
           ))}
           <div ref={bottomRef} />
         </div>
