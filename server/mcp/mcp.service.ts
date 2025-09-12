@@ -1,8 +1,8 @@
 import { Injectable } from "@nestjs/common";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import axios from "axios";
 import path from "path";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { ConfigService } from "@nestjs/config";
 
 @Injectable()
@@ -15,15 +15,19 @@ export class McpService {
 
   constructor(private configService: ConfigService) {}
 
-  private async getClient(): Promise<Client> {
-    if (this.client) return this.client;
+  private getMcpBaseUrl() {
+    return (
+      this.configService.get<string>("MCP_BASE_URL") || "http://localhost:3001"
+    );
+  }
 
+  private async ensureStdIoClient(): Promise<Client> {
+    if (this.client) return this.client;
     const nodeExecutable = process.platform === "win32" ? "node.exe" : "node";
     const mcpServerPath = path.resolve(
       __dirname,
       "../../../hello_world_mpc/src/server.js",
     );
-
     const env = {
       ...process.env,
       JIRA_OAUTH_CLIENT_ID: this.configService.get("JIRA_OAUTH_CLIENT_ID"),
@@ -35,7 +39,7 @@ export class McpService {
         "api.atlassian.com",
       ),
       JIRA_CLOUD_ID: this.configService.get("JIRA_CLOUD_ID"),
-    };
+    } as Record<string, string | undefined>;
 
     const transport = new StdioClientTransport({
       command: nodeExecutable,
@@ -44,12 +48,36 @@ export class McpService {
       cwd: path.dirname(mcpServerPath),
     });
 
-    this.client = new Client(
+    const client = new Client(
       { name: "clone-gpt-mcp-proxy", version: "1.0.0" },
       { capabilities: { tools: {}, resources: {} } },
     );
-    await this.client.connect(transport);
-    return this.client;
+    await client.connect(transport);
+    this.client = client;
+    return client;
+  }
+
+  private async callRpc<T = any>(method: string, params?: any): Promise<T> {
+    // Try HTTP first
+    try {
+      const url = `${this.getMcpBaseUrl()}/mcp`;
+      const res = await axios.post(
+        url,
+        { jsonrpc: "2.0", id: method, method, params },
+        { timeout: 65000 },
+      );
+      return res.data as T;
+    } catch (err: any) {
+      // Fallback to STDIO (for dev, or when HTTP MCP is not running)
+      const client = await this.ensureStdIoClient();
+      if (method === "listTools") return client.listTools() as unknown as T;
+      if (method === "listResources")
+        return client.listResources() as unknown as T;
+      if (method === "callTool") return client.callTool(params) as unknown as T;
+      if (method === "readResource")
+        return client.readResource(params) as unknown as T;
+      throw err;
+    }
   }
 
   async getOAuthToken(): Promise<string> {
@@ -76,22 +104,18 @@ export class McpService {
   }
 
   async listTools() {
-    const client = await this.getClient();
-    return client.listTools();
+    return this.callRpc("listTools");
   }
 
   async listResources() {
-    const client = await this.getClient();
-    return client.listResources();
+    return this.callRpc("listResources");
   }
 
   async callTool(name: string, args: Record<string, any>) {
-    const client = await this.getClient();
-    return client.callTool({ name, arguments: args });
+    return this.callRpc("callTool", { name, arguments: args });
   }
 
   async readResource(uri: string) {
-    const client = await this.getClient();
-    return client.readResource({ uri });
+    return this.callRpc("readResource", { uri });
   }
 }

@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Post } from "@nestjs/common";
 import { McpService } from "./mcp.service";
 
-@Controller("api/mcp")
+@Controller("mcp")
 export class McpController {
   constructor(private readonly mcpService: McpService) {}
 
