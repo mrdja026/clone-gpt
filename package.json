@@ -11,8 +11,8 @@
     ]
   },
   "scripts": {
-    "dev": "vite",
-    "dev:server": "tsx watch server/main.ts",
+    "dev": "concurrently -k -n VITE,NEST \"vite\" \"cross-env PORT=3001 tsx watch server/main.ts\"",
+    "dev:server": "cross-env PORT=3001 tsx watch server/main.ts",
     "dev:tail-mcp": "node ../hello_world_mpc/scripts/tail-log.js",
     "build": "npm run build:client && npm run build:server",
     "build:client": "vite build",

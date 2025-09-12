@@ -5,8 +5,10 @@ import type { Conversation, Message } from "@/components/chat/types";
 import { QuerySearch } from "@/components/QuerySearch";
 import { deterministicQueries } from "@/lib/queries";
 import { cn } from "@/lib/utils";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { Moon, SunMedium } from "lucide-react";
+import AboutDialog from "@/components/AboutDialog";
+import AboutContent from "@/components/AboutContent";
 
 function uid(prefix = "id") {
   return `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
@@ -206,6 +208,7 @@ export default function PostLogin() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <AboutDialog trigger={<Button variant="ghost" size="sm">About</Button>} />
             <Button variant="ghost" size="sm" onClick={() => navigate("/chat")}>Open Full Chat</Button>
             <Button
               variant="ghost"
@@ -258,6 +261,21 @@ export default function PostLogin() {
               }
               initialPrompt={pendingPrompt}
             />
+          </div>
+        </section>
+
+        {/* About preview on home */}
+        <section className="mt-12">
+          <div className="mx-auto max-w-5xl">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-semibold">About</h2>
+              <Button variant="link" asChild>
+                <Link to="/about">View full page</Link>
+              </Button>
+            </div>
+            <div className="">
+              <AboutContent compact />
+            </div>
           </div>
         </section>
       </main>
