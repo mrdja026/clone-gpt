@@ -13,9 +13,10 @@ interface ChatAreaProps {
   onBranchFrom: (messageId: string) => void;
   onSwitchConversation: (id: string) => void;
   onCloseConversation: (id: string) => void;
+  initialPrompt?: string;
 }
 
-export function ChatArea({ conversation, siblingConversations, onSend, onBranchFrom, onSwitchConversation, onCloseConversation }: ChatAreaProps) {
+export function ChatArea({ conversation, siblingConversations, onSend, onBranchFrom, onSwitchConversation, onCloseConversation, initialPrompt }: ChatAreaProps) {
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
   const bottomRef = useRef<HTMLDivElement | null>(null);
