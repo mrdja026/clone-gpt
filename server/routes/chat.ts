@@ -4,7 +4,7 @@ import { createOpenAI } from "@ai-sdk/openai";
 
 // Configure OpenAI-compatible provider (works with Ollama)
 const ollama = createOpenAI({
-  apiKey: process.env.OPENAI_API_KEY || "branko:latest",
+  apiKey: process.env.OPENAI_API_KEY || "ollama",
   baseURL: process.env.OPENAI_BASE_URL || "http://127.0.0.1:11434/v1",
 });
 

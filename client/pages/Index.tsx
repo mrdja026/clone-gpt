@@ -6,6 +6,8 @@ import type { Conversation, Message } from "@/components/chat/types";
 import type { QueryTemplate } from "@/components/chat/types";
 import { cn } from "@/lib/utils";
 import { Moon, SunMedium } from "lucide-react";
+import { matchQuery, formatMCPResponse } from "@/lib/query-matcher";
+import { mcpClient } from "@/lib/mcp-client";
 
 const deterministicQueries: QueryTemplate[] = [
   {
@@ -258,16 +260,55 @@ export default function Index() {
       ),
     );
 
-    // Get current conversation to pass as context
-    const currentConv = conversations.find((c) => c.id === activeId);
-    const conversationHistory = currentConv ? currentConv.messages : [];
+    // Check if this is a deterministic query that needs MCP handling
+    const queryMatch = matchQuery(text);
+    let mcpResults: string = "";
+    let enhancedPrompt = text;
 
-    // Stream the response
-    const fullAnswer = await callModelStreaming(
-      text,
-      conversationHistory,
-      (chunk: string) => {
-        // Update the bot message content in real-time
+    if (queryMatch.isMatch && queryMatch.mcpActions.length > 0) {
+      // Update bot message to show MCP processing
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.id === activeId
+            ? {
+                ...c,
+                messages: c.messages.map((m) =>
+                  m.id === botMessageId
+                    ? { ...m, content: "🔍 Fetching data from JIRA..." }
+                    : m,
+                ),
+              }
+            : c,
+        ),
+      );
+
+      try {
+        // Execute MCP actions
+        const mcpPromises = queryMatch.mcpActions.map(async (action) => {
+          try {
+            const response = await mcpClient.executeAction(action);
+            const responseText =
+              ("content" in response
+                ? response.content?.[0]?.text
+                : response.contents?.[0]?.text) || "No data returned";
+            return formatMCPResponse(action, responseText);
+          } catch (error) {
+            console.error(`MCP action ${action.type} failed:`, error);
+            return `❌ Failed to execute ${action.description}: ${error instanceof Error ? error.message : "Unknown error"}`;
+          }
+        });
+
+        const mcpResultsArray = await Promise.all(mcpPromises);
+        mcpResults = mcpResultsArray.join("\n\n");
+
+        // Use enhanced prompt if available
+        if (queryMatch.enhancedPrompt) {
+          enhancedPrompt = `${queryMatch.enhancedPrompt}\n\nRetrieved Data:\n${mcpResults}`;
+        } else {
+          enhancedPrompt = `${text}\n\nRetrieved Data:\n${mcpResults}`;
+        }
+
+        // Update bot message with MCP results immediately
         setConversations((prev) =>
           prev.map((c) =>
             c.id === activeId
@@ -275,33 +316,113 @@ export default function Index() {
                   ...c,
                   messages: c.messages.map((m) =>
                     m.id === botMessageId
-                      ? { ...m, content: m.content + chunk }
+                      ? {
+                          ...m,
+                          content: `${mcpResults}\n\n🤖 Analyzing data...`,
+                        }
                       : m,
                   ),
                 }
               : c,
           ),
         );
-      },
-    );
+      } catch (error) {
+        console.error("MCP processing failed:", error);
+        mcpResults = `❌ Failed to retrieve data: ${error instanceof Error ? error.message : "Unknown error"}`;
 
-    // Final update to ensure we have the complete message
-    setConversations((prev) =>
-      prev.map((c) =>
-        c.id === activeId
-          ? {
-              ...c,
-              messages: c.messages.map((m) =>
-                m.id === botMessageId ? { ...m, content: fullAnswer } : m,
-              ),
-            }
-          : c,
-      ),
-    );
+        setConversations((prev) =>
+          prev.map((c) =>
+            c.id === activeId
+              ? {
+                  ...c,
+                  messages: c.messages.map((m) =>
+                    m.id === botMessageId ? { ...m, content: mcpResults } : m,
+                  ),
+                }
+              : c,
+          ),
+        );
+        return; // Don't proceed to LLM if MCP fails
+      }
+    }
+
+    // Get current conversation to pass as context
+    const currentConv = conversations.find((c) => c.id === activeId);
+    const conversationHistory = currentConv ? currentConv.messages : [];
+
+    // Stream the LLM response (fallback or enhancement)
+    let llmResponse = "";
+    try {
+      const fullAnswer = await callModelStreaming(
+        enhancedPrompt,
+        conversationHistory,
+        (chunk: string) => {
+          llmResponse += chunk;
+          // Update the bot message content in real-time
+          const currentContent = mcpResults
+            ? `${mcpResults}\n\n**Analysis:**\n`
+            : "";
+          setConversations((prev) =>
+            prev.map((c) =>
+              c.id === activeId
+                ? {
+                    ...c,
+                    messages: c.messages.map((m) =>
+                      m.id === botMessageId
+                        ? { ...m, content: currentContent + llmResponse }
+                        : m,
+                    ),
+                  }
+                : c,
+            ),
+          );
+        },
+      );
+
+      // Final update to ensure we have the complete message
+      const finalContent = mcpResults
+        ? `${mcpResults}\n\n**Analysis:**\n${fullAnswer}`
+        : fullAnswer;
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.id === activeId
+            ? {
+                ...c,
+                messages: c.messages.map((m) =>
+                  m.id === botMessageId ? { ...m, content: finalContent } : m,
+                ),
+              }
+            : c,
+        ),
+      );
+    } catch (error) {
+      console.error("LLM processing failed:", error);
+      // If we have MCP results but LLM fails, show just the MCP results
+      const fallbackContent =
+        mcpResults ||
+        `❌ Failed to process request: ${error instanceof Error ? error.message : "Unknown error"}`;
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.id === activeId
+            ? {
+                ...c,
+                messages: c.messages.map((m) =>
+                  m.id === botMessageId
+                    ? { ...m, content: fallbackContent }
+                    : m,
+                ),
+              }
+            : c,
+        ),
+      );
+    }
 
     const conv = conversations.find((c) => c.id === activeId);
     if (conv) {
-      const finalBotMessage = { ...botMessage, content: fullAnswer };
+      const finalBotMessage = {
+        ...botMessage,
+        content: mcpResults || llmResponse,
+      };
       addToHistoryIfNeeded({
         ...conv,
         messages: [...conv.messages, userMessage, finalBotMessage],

@@ -3,6 +3,12 @@ import express from "express";
 import cors from "cors";
 import { handleDemo } from "./routes/demo";
 import { handleChat, handleChatSync } from "./routes/chat";
+import {
+  handleListTools,
+  handleListResources,
+  handleCallTool,
+  handleReadResource,
+} from "./routes/mcp";
 
 export function createServer() {
   const app = express();
@@ -23,6 +29,12 @@ export function createServer() {
   // AI Chat endpoints
   app.post("/api/chat", handleChatSync); // Non-streaming endpoint
   app.post("/api/chat/stream", handleChat); // Streaming endpoint
+
+  // MCP endpoints
+  app.get("/api/mcp/tools", handleListTools);
+  app.get("/api/mcp/resources", handleListResources);
+  app.post("/api/mcp/tool", handleCallTool);
+  app.post("/api/mcp/resource", handleReadResource);
 
   return app;
 }

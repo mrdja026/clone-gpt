@@ -20,7 +20,8 @@
     "start:dev": "tsx server/main.ts",
     "test": "vitest --run",
     "format.fix": "prettier --write .",
-    "typecheck": "tsc"
+    "typecheck": "tsc",
+    "dev:mcp": "node start-with-mcp.mjs"
   },
   "dependencies": {
     "@ai-sdk/openai": "^2.0.28",
@@ -37,7 +38,8 @@
     "express": "^5.1.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
-    "zod": "^3.25.76"
+    "zod": "^3.25.76",
+    "@modelcontextprotocol/sdk": "^1.0.0"
   },
   "devDependencies": {
     "@hookform/resolvers": "^5.2.1",

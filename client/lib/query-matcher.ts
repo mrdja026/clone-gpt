@@ -1,0 +1,318 @@
+/**
+ * Query Matcher - Detects deterministic queries and maps them to MCP tool calls
+ */
+
+export interface MCPAction {
+  toolName?: string;
+  resourceUri?: string;
+  args: Record<string, any>;
+  description: string;
+  type: "tool" | "resource";
+}
+
+export interface QueryMatch {
+  isMatch: boolean;
+  confidence: number;
+  originalQuery: string;
+  mcpActions: MCPAction[];
+  enhancedPrompt?: string;
+}
+
+/**
+ * Extract JIRA ticket keys from text (e.g., SCRUM-8, ABC-123)
+ */
+function extractJiraKeys(text: string): string[] {
+  const jiraKeyPattern = /\b[A-Z][A-Z0-9]+-\d+\b/g;
+  return text.match(jiraKeyPattern) || [];
+}
+
+/**
+ * Extract ticket ID when "Ticket" is mentioned (case insensitive)
+ * Looks for patterns like "Ticket SCRUM-8", "ticket ABC-123", etc.
+ */
+function extractTicketIds(text: string): string[] {
+  const ticketPattern = /\bticket\s+([A-Z][A-Z0-9]+-\d+)\b/gi;
+  const matches = [];
+  let match;
+  while ((match = ticketPattern.exec(text)) !== null) {
+    matches.push(match[1]);
+  }
+  return matches.length > 0 ? matches : extractJiraKeys(text);
+}
+
+/**
+ * Extract project IDs from text (project names, keys)
+ * Looks for patterns like "project SCRUM", "in PROJECT-X", etc.
+ */
+function extractProjectIds(text: string): string[] {
+  const projectPattern = /\b(?:project|in)\s+([A-Z][A-Z0-9-]*)\b/gi;
+  const matches = [];
+  let match;
+  while ((match = projectPattern.exec(text)) !== null) {
+    matches.push(match[1]);
+  }
+  return matches;
+}
+
+/**
+ * Extract version numbers from text (e.g., v1.2.3, version 2.0.1)
+ */
+function extractVersions(text: string): string[] {
+  const versionPattern = /v?\d+\.\d+(?:\.\d+)?/g;
+  return text.match(versionPattern) || [];
+}
+
+/**
+ * Extract team names from text (e.g., TEAM-A, team Alpha)
+ */
+function extractTeamNames(text: string): string[] {
+  const teamPattern = /\b(?:team\s+)?([A-Z][A-Z0-9-]*|[A-Z][a-z]+)\b/gi;
+  const matches = text.match(teamPattern) || [];
+  return matches.map((m) => m.replace(/^team\s+/i, ""));
+}
+
+/**
+ * Match user query against deterministic patterns and generate MCP actions
+ */
+export function matchQuery(userInput: string): QueryMatch {
+  const input = userInput.toLowerCase().trim();
+  const originalInput = userInput.trim();
+
+  // Pattern 1: Ticket-specific queries - uses "Ticket" keyword to extract ID
+  if (input.includes("ticket")) {
+    const ticketIds = extractTicketIds(originalInput);
+    if (ticketIds.length > 0) {
+      return {
+        isMatch: true,
+        confidence: 0.95,
+        originalQuery: userInput,
+        mcpActions: ticketIds.map((ticketKey) => ({
+          toolName: "fetch_jira_ticket",
+          args: { ticketKey },
+          description: `Fetching details for JIRA ticket ${ticketKey}`,
+          type: "tool",
+        })),
+        enhancedPrompt: `Based on the JIRA ticket data retrieved, provide a detailed summary including status, assignee, and any blockers or dependencies.`,
+      };
+    }
+  }
+
+  // Pattern 2: Project-specific queries - uses "project" keyword to extract project ID
+  if (input.includes("project")) {
+    const projectIds = extractProjectIds(originalInput);
+    if (projectIds.length > 0) {
+      return {
+        isMatch: true,
+        confidence: 0.9,
+        originalQuery: userInput,
+        mcpActions: [
+          {
+            resourceUri: "mcp://local-mcp-server/jira/projects",
+            args: { projectKey: projectIds[0] }, // UATATT3xFfGF0jY1vdCOzuxrQkeZquVROuU44A74Z4K20I9oj_TO0wGz5OEN0zoVQ7di06LKFnsRTB6cQHiJ4Qom6_GPC_6u3DHxYKJMQ_ysqj0TDZ0Pof0Qyt2Tyee-YQW5bk7ZpYnu6frO61TjHUh63IrA1-OFTTWOW1gmv-MG7aSqn_VsPUqU=B6C93EE6se projectKey for filtering
+            description: `Fetching information for project ${projectIds[0]}`,
+            type: "resource",
+          },
+        ],
+        enhancedPrompt: `Based on the project data for ${projectIds[0]} (SCRUM, HWP, etc.), provide detailed insights about the project structure, current boards, and available resources.`,
+      };
+    } else {
+      // General project query without specific ID
+      return {
+        isMatch: true,
+        confidence: 0.8,
+        originalQuery: userInput,
+        mcpActions: [
+          {
+            resourceUri: "mcp://local-mcp-server/jira/projects",
+            args: {},
+            description: "Fetching all available projects (SCRUM, HWP, etc.)",
+            type: "resource",
+          },
+        ],
+        enhancedPrompt: `Based on the project data, provide an overview of all available projects (like SCRUM and HWP) and help the user understand the project landscape.`,
+      };
+    }
+  }
+
+  // Pattern 3: Sprint-specific queries - distinguished from projects
+  if (input.includes("sprint") && !input.includes("project")) {
+    return {
+      isMatch: true,
+      confidence: 0.9,
+      originalQuery: userInput,
+      mcpActions: [
+        {
+          resourceUri: "mcp://local-mcp-server/jira/current-sprint",
+          args: {},
+          description:
+            "Fetching current active sprint information across all projects",
+          type: "resource",
+        },
+      ],
+      enhancedPrompt: `Based on the current sprint data across projects (SCRUM, HWP), provide insights about sprint progress, goals, and any recommendations for the teams.`,
+    };
+  }
+
+  // Pattern 3b: Project + Sprint queries - specific project's sprint
+  if (input.includes("sprint") && input.includes("project")) {
+    const projectIds = extractProjectIds(originalInput);
+    const projectKey = projectIds.length > 0 ? projectIds[0] : "SCRUM";
+    return {
+      isMatch: true,
+      confidence: 0.95,
+      originalQuery: userInput,
+      mcpActions: [
+        {
+          resourceUri: "mcp://local-mcp-server/jira/current-sprint",
+          args: { projectKey },
+          description: `Fetching current sprint information for project ${projectKey}`,
+          type: "resource",
+        },
+      ],
+      enhancedPrompt: `Based on the current sprint data for project ${projectKey}, provide insights about sprint progress, goals, and specific recommendations for this project team.`,
+    };
+  }
+
+  // Pattern 4: Issue/ticket queries (fallback without "ticket" keyword)
+  if (input.includes("issue") || input.includes("task")) {
+    const jiraKeys = extractJiraKeys(originalInput);
+    if (jiraKeys.length > 0) {
+      return {
+        isMatch: true,
+        confidence: 0.85,
+        originalQuery: userInput,
+        mcpActions: jiraKeys.map((ticketKey) => ({
+          toolName: "fetch_jira_ticket",
+          args: { ticketKey },
+          description: `Fetching details for JIRA ticket ${ticketKey}`,
+          type: "tool",
+        })),
+        enhancedPrompt: `Based on the JIRA ticket data retrieved, provide a detailed analysis including status, assignee, and any blockers or dependencies.`,
+      };
+    } else {
+      // General issue query - show projects to help find issues
+      return {
+        isMatch: true,
+        confidence: 0.7,
+        originalQuery: userInput,
+        mcpActions: [
+          {
+            resourceUri: "mcp://local-mcp-server/jira/projects",
+            args: {},
+            description: "Fetching project list to identify available issues",
+            type: "resource",
+          },
+        ],
+        enhancedPrompt: `Based on the project data, help the user understand how to find their assigned issues. Note that detailed issue listing would require additional JIRA API endpoints.`,
+      };
+    }
+  }
+
+  // Pattern 5: Release notes and version queries
+  if (
+    input.includes("release notes") ||
+    input.includes("release") ||
+    (input.includes("generate") && input.includes("version"))
+  ) {
+    const versions = extractVersions(originalInput);
+    return {
+      isMatch: true,
+      confidence: 0.8,
+      originalQuery: userInput,
+      mcpActions: [
+        {
+          resourceUri: "mcp://local-mcp-server/jira/projects",
+          args: {},
+          description:
+            "Fetching project information for release notes generation",
+          type: "resource",
+        },
+      ],
+      enhancedPrompt: `Based on the project data, provide guidance on generating release notes${versions.length > 0 ? ` for version ${versions[0]}` : ""}. Include typical sections like new features, bug fixes, and breaking changes.`,
+    };
+  }
+
+  // Pattern 6: Blocker analysis
+  if (input.includes("blockers") || input.includes("blocked")) {
+    const jiraKeys = extractJiraKeys(originalInput);
+    if (jiraKeys.length > 0) {
+      return {
+        isMatch: true,
+        confidence: 0.9,
+        originalQuery: userInput,
+        mcpActions: jiraKeys.map((ticketKey) => ({
+          toolName: "fetch_jira_ticket",
+          args: { ticketKey },
+          description: `Fetching details for ${ticketKey} to identify blockers`,
+          type: "tool",
+        })),
+        enhancedPrompt: `Based on the retrieved ticket data, analyze for any blockers, dependencies, or impediments. Provide actionable recommendations to resolve them.`,
+      };
+    }
+  }
+
+  // No match found
+  return {
+    isMatch: false,
+    confidence: 0,
+    originalQuery: userInput,
+    mcpActions: [],
+  };
+}
+
+/**
+ * Format MCP response data for display
+ */
+export function formatMCPResponse(action: MCPAction, response: any): string {
+  try {
+    const data = typeof response === "string" ? JSON.parse(response) : response;
+
+    // Handle based on action type and identifier
+    const identifier = action.toolName || action.resourceUri;
+
+    switch (identifier) {
+      case "fetch_jira_ticket":
+        return `**JIRA Ticket: ${data.key}**
+📋 **Summary:** ${data.summary}
+📊 **Status:** ${data.status}
+👤 **Assignee:** ${data.assignee || "Unassigned"}
+⚡ **Priority:** ${data.priority || "Normal"}
+📝 **Description:** ${data.description}
+${data.blockers && data.blockers.length > 0 ? `🚫 **Blockers:**\n${data.blockers.map((b: string) => `  • ${b}`).join("\n")}` : ""}
+`;
+
+      case "mcp://local-mcp-server/jira/projects":
+      case "list_jira_projects": // backward compatibility
+      case "fetch_jira_projects": // backward compatibility
+        if (Array.isArray(data)) {
+          return `**Available Projects:**
+${data.map((project) => `• **${project.key}** - ${project.name} (${project.projectTypeKey})`).join("\n")}
+`;
+        }
+        break;
+
+      case "mcp://local-mcp-server/jira/current-sprint":
+      case "get_current_sprint_summary": // backward compatibility
+      case "fetch_current_sprint": // backward compatibility
+        if (data.activeSprints && Array.isArray(data.activeSprints)) {
+          return `**Active Sprints:**
+${data.activeSprints
+  .map(
+    (sprint) =>
+      `• **${sprint.name}** (${sprint.boardName})
+  - Goal: ${sprint.goal}
+  - Dates: ${sprint.startDate ? new Date(sprint.startDate).toLocaleDateString() : "TBD"} - ${sprint.endDate ? new Date(sprint.endDate).toLocaleDateString() : "TBD"}`,
+  )
+  .join("\n\n")}
+`;
+        }
+        return `**Sprint Summary:** ${data.summary || "No active sprints found"}`;
+
+      default:
+        return `**${action.description}:**\n\`\`\`json\n${JSON.stringify(data, null, 2)}\n\`\`\``;
+    }
+  } catch (error) {
+    console.error("Error formatting MCP response:", error);
+    return `**${action.description}:**\n${response}`;
+  }
+}
