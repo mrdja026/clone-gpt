@@ -111,7 +111,12 @@ export default function Index() {
     setConversations((prev) => prev.filter((c) => c.id !== id));
     if (activeId === id) {
       const remaining = conversations.filter((c) => c.id !== id);
-      setActiveId(remaining[0]?.id || newChat());
+      if (remaining[0]) setActiveId(remaining[0].id);
+      else {
+        const c: Conversation = { id: uid("conv"), title: "New chat", messages: [], createdAt: Date.now() };
+        setConversations((prev) => [c, ...prev]);
+        setActiveId(c.id);
+      }
     }
   };
 
