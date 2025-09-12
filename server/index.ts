@@ -2,6 +2,8 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import { handleDemo } from "./routes/demo";
+import { verifyMcpJwt } from "./middleware/jwt";
+import { measureMcpLatency } from "./middleware/timing";
 import { handleChat, handleChatSync } from "./routes/chat";
 import {
   handleListTools,
@@ -30,7 +32,8 @@ export function createServer() {
   app.post("/api/chat", handleChatSync); // Non-streaming endpoint
   app.post("/api/chat/stream", handleChat); // Streaming endpoint
 
-  // MCP endpoints
+  // MCP endpoints (JWT optional in dev; enforced when MCP_JWT_SECRET set)
+  app.use("/api/mcp", measureMcpLatency, verifyMcpJwt);
   app.get("/api/mcp/tools", handleListTools);
   app.get("/api/mcp/resources", handleListResources);
   app.post("/api/mcp/tool", handleCallTool);
