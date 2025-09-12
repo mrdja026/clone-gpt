@@ -33,11 +33,19 @@ export function ChatArea({ conversation, siblingConversations, onSend, onBranchF
   const base = useMemo(() => siblingConversations.find((c) => c.id === groupHeadId) || conversation, [siblingConversations, groupHeadId, conversation]);
   const branches = useMemo(() => siblingConversations.filter((c) => c.id !== groupHeadId), [siblingConversations, groupHeadId]);
 
+  const firstLevelCount = useMemo(() => branches.filter((c) => c.parentId === base.id).length, [branches, base.id]);
+
   const tabs = useMemo(() => {
-    if (branches.length === 0) return [] as { id: string; label: string; closable?: boolean }[];
+    if (branches.length === 0) return [] as { id: string; label: React.ReactNode; closable?: boolean }[];
     const branchTabs = branches.map((c, i) => ({ id: c.id, label: `B${i + 1}` }));
-    return [{ id: base.id, label: "Original", closable: false }, ...branchTabs];
-  }, [branches, base.id]);
+    const mainLabel = (
+      <span className="flex items-center gap-2">
+        <FolderWithSubs count={firstLevelCount} />
+        <span className="truncate max-w-[26ch]">{base.title}</span>
+      </span>
+    );
+    return [{ id: base.id, label: mainLabel, closable: false }, ...branchTabs];
+  }, [branches, base.id, base.title, firstLevelCount]);
 
   const handleSend = async () => {
     const text = input.trim();
