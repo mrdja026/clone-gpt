@@ -36,6 +36,7 @@ alwaysApply: true
 
 # MCP MUST BE USED
 
+- MPC USES STDIO COMMUNICATION AND JSONRPC2 to get send data
 - hello_world_mcp C:\Users\Mrdjan\Documents\workspace\hello_world_mpc must be used
 - contains the logic that creates barebones mcp C:\Users\Mrdjan\Documents\workspace\hello_world_mpc\src\server.js
 - packages are in C:\Users\Mrdjan\Documents\workspace\hello_world_mpc\package.json

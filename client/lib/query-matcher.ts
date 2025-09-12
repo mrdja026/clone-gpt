@@ -88,11 +88,11 @@ export function matchQuery(userInput: string): QueryMatch {
         originalQuery: userInput,
         mcpActions: ticketIds.map((ticketKey) => ({
           toolName: "fetch_jira_ticket",
-          args: { ticketKey: "SCRUM-8" }, // Override with a demo ticket that exists
-          description: `Fetching details for JIRA ticket SCRUM-8 (Demo replacement for ${ticketKey})`,
+          args: { ticketKey },
+          description: `Fetching details for JIRA ticket ${ticketKey}`,
           type: "tool",
         })),
-        enhancedPrompt: `Based on the JIRA ticket data retrieved, provide a detailed summary including status, assignee, and any blockers or dependencies.`,
+        enhancedPrompt: `You are in strict analysis mode. Only use the 'Retrieved Data' below that comes from the MCP JIRA tool. If no data is present, reply: "No JIRA data found for ${ticketIds[0]}". Do not infer or hallucinate.`,
       };
     }
   }
@@ -108,12 +108,12 @@ export function matchQuery(userInput: string): QueryMatch {
         mcpActions: [
           {
             resourceUri: "mcp://local-mcp-server/jira/projects",
-            args: { projectKey: projectIds[0] }, // UATATT3xFfGF0jY1vdCOzuxrQkeZquVROuU44A74Z4K20I9oj_TO0wGz5OEN0zoVQ7di06LKFnsRTB6cQHiJ4Qom6_GPC_6u3DHxYKJMQ_ysqj0TDZ0Pof0Qyt2Tyee-YQW5bk7ZpYnu6frO61TjHUh63IrA1-OFTTWOW1gmv-MG7aSqn_VsPUqU=B6C93EE6se projectKey for filtering
+            args: { projectKey: projectIds[0] },
             description: `Fetching information for project ${projectIds[0]}`,
             type: "resource",
           },
         ],
-        enhancedPrompt: `Based on the project data for ${projectIds[0]} (SCRUM, HWP, etc.), provide detailed insights about the project structure, current boards, and available resources.`,
+        enhancedPrompt: `You are in strict analysis mode. Only summarize what is present in 'Retrieved Data' from MCP for project ${projectIds[0]}. Do not infer or hallucinate beyond those fields.`,
       };
     } else {
       // General project query without specific ID
@@ -129,7 +129,7 @@ export function matchQuery(userInput: string): QueryMatch {
             type: "resource",
           },
         ],
-        enhancedPrompt: `Based on the project data, provide an overview of all available projects (like SCRUM and HWP) and help the user understand the project landscape.`,
+        enhancedPrompt: `You are in strict analysis mode. Only summarize what is present in 'Retrieved Data' from MCP about available projects. Do not infer or hallucinate beyond those fields.`,
       };
     }
   }
@@ -183,11 +183,11 @@ export function matchQuery(userInput: string): QueryMatch {
         originalQuery: userInput,
         mcpActions: jiraKeys.map((ticketKey) => ({
           toolName: "fetch_jira_ticket",
-          args: { ticketKey: "SCRUM-8" }, // Override with a demo ticket that exists
-          description: `Fetching details for JIRA ticket SCRUM-8 (Demo replacement for ${ticketKey})`,
+          args: { ticketKey },
+          description: `Fetching details for JIRA ticket ${ticketKey}`,
           type: "tool",
         })),
-        enhancedPrompt: `Based on the JIRA ticket data retrieved, provide a detailed analysis including status, assignee, and any blockers or dependencies.`,
+        enhancedPrompt: `You are in strict analysis mode. Only use the 'Retrieved Data' from MCP JIRA to answer. If it is empty or an error, state that no data was retrieved for ${jiraKeys[0]} and stop. Do not hallucinate.`,
       };
     } else {
       // General issue query - show projects to help find issues
@@ -242,11 +242,11 @@ export function matchQuery(userInput: string): QueryMatch {
         originalQuery: userInput,
         mcpActions: jiraKeys.map((ticketKey) => ({
           toolName: "fetch_jira_ticket",
-          args: { ticketKey: "SCRUM-8" }, // Override with a demo ticket that exists
-          description: `Fetching details for SCRUM-8 (Demo replacement for ${ticketKey}) to identify blockers`,
+          args: { ticketKey },
+          description: `Fetching details for ${ticketKey} to identify blockers`,
           type: "tool",
         })),
-        enhancedPrompt: `Based on the retrieved ticket data, analyze for any blockers, dependencies, or impediments. Provide actionable recommendations to resolve them.`,
+        enhancedPrompt: `You are in strict analysis mode. Analyze only the 'Retrieved Data' for blockers or dependencies. If empty, reply that blockers cannot be determined because no data was retrieved for ${jiraKeys[0]}. Do not hallucinate.`,
       };
     }
   }

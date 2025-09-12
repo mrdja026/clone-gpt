@@ -6,6 +6,7 @@ import { ChatsService } from "../services/chats.service";
 import { MessagesService } from "../services/messages.service";
 import { CreateChatDto } from "../entities/chat.entity";
 import { CreateMessageDto } from "../entities/message.entity";
+import { McpService } from "../mcp/mcp.service";
 
 // Configure provider for Ollama's OpenAI-compatible endpoint
 const ollama = createOpenAICompatible({
@@ -30,6 +31,7 @@ export class EnhancedChatService {
   constructor(
     private readonly chatsService: ChatsService,
     private readonly messagesService: MessagesService,
+    private readonly mcpService: McpService,
   ) {}
 
   async createOrGetChat(chatId?: string, userId?: string, title?: string) {
