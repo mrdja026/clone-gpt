@@ -3,7 +3,7 @@ import type { Conversation, Message } from "./types";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ArrowRight, GitBranch, Loader2 } from "lucide-react";
+import { ArrowRight, GitBranch, Loader2, Folder } from "lucide-react";
 import { TabBar } from "./TabBar";
 
 interface ChatAreaProps {
