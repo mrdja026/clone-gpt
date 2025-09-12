@@ -14,12 +14,28 @@ interface RightSidebarProps {
   onNewChat: () => void;
 }
 
-export function RightSidebar({ className, queries, onUseQuery, history, onOpenConversation, onNewChat }: RightSidebarProps) {
+export function RightSidebar({
+  className,
+  queries,
+  onUseQuery,
+  history,
+  onOpenConversation,
+  onNewChat,
+}: RightSidebarProps) {
   return (
-    <aside className={cn("w-full lg:w-80 border-l bg-sidebar text-sm flex flex-col", className)}>
+    <aside
+      className={cn(
+        "w-full lg:w-80 border-l bg-sidebar text-sm flex flex-col",
+        className,
+      )}
+    >
       <div className="p-4 flex items-center justify-between">
         <div className="font-semibold text-sidebar-foreground">Panel</div>
-        <Button size="sm" onClick={onNewChat} className="bg-primary text-primary-foreground">
+        <Button
+          size="sm"
+          onClick={onNewChat}
+          className="bg-primary text-primary-foreground"
+        >
           <Plus className="mr-2" /> New chat
         </Button>
       </div>
@@ -27,7 +43,9 @@ export function RightSidebar({ className, queries, onUseQuery, history, onOpenCo
       <ScrollArea className="flex-1">
         <div className="p-4 space-y-6">
           <section>
-            <h3 className="text-xs uppercase tracking-wide text-muted-foreground mb-3">Deterministic queries</h3>
+            <h3 className="text-xs uppercase tracking-wide text-muted-foreground mb-3">
+              Deterministic queries
+            </h3>
             <div className="grid grid-cols-1 gap-2">
               {queries.map((q) => (
                 <button
@@ -42,10 +60,14 @@ export function RightSidebar({ className, queries, onUseQuery, history, onOpenCo
             </div>
           </section>
           <section>
-            <h3 className="text-xs uppercase tracking-wide text-muted-foreground mb-3">Past chats</h3>
+            <h3 className="text-xs uppercase tracking-wide text-muted-foreground mb-3">
+              Past chats
+            </h3>
             <div className="space-y-2">
               {history.length === 0 && (
-                <div className="text-muted-foreground text-xs">No chats yet</div>
+                <div className="text-muted-foreground text-xs">
+                  No chats yet
+                </div>
               )}
               {history.map((c) => (
                 <button

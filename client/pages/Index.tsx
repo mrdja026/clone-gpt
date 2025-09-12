@@ -8,11 +8,35 @@ import { cn } from "@/lib/utils";
 import { Moon, SunMedium } from "lucide-react";
 
 const deterministicQueries: QueryTemplate[] = [
-  { id: "q1", label: "Get Jira issue ABC-123 details", template: "Show details for issue ABC-123 including status, assignee, and blockers." },
-  { id: "q2", label: "List my issues by priority", template: "List all issues assigned to me ordered by priority with links." },
-  { id: "q3", label: "Release notes for vX.Y.Z", template: "Generate concise release notes for version v1.2.3 from merged tickets." },
-  { id: "q4", label: "Find blockers for EPIC-1", template: "What are the current blockers for epic EPIC-1 and action items to unblock?" },
-  { id: "q5", label: "Sprint plan for TEAM A", template: "Create a 2-week sprint plan for team TEAM-A targeting 30 story points based on backlog." },
+  {
+    id: "q1",
+    label: "Get Jira issue ABC-123 details",
+    template:
+      "Show details for issue ABC-123 including status, assignee, and blockers.",
+  },
+  {
+    id: "q2",
+    label: "List my issues by priority",
+    template: "List all issues assigned to me ordered by priority with links.",
+  },
+  {
+    id: "q3",
+    label: "Release notes for vX.Y.Z",
+    template:
+      "Generate concise release notes for version v1.2.3 from merged tickets.",
+  },
+  {
+    id: "q4",
+    label: "Find blockers for EPIC-1",
+    template:
+      "What are the current blockers for epic EPIC-1 and action items to unblock?",
+  },
+  {
+    id: "q5",
+    label: "Sprint plan for TEAM A",
+    template:
+      "Create a 2-week sprint plan for team TEAM-A targeting 30 story points based on backlog.",
+  },
 ];
 
 function uid(prefix = "id") {
@@ -39,18 +63,41 @@ export default function Index() {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) return JSON.parse(raw) as Conversation[];
     } catch {}
-    return [{ id: uid("conv"), title: "New chat", messages: [], createdAt: Date.now() }];
+    return [
+      {
+        id: uid("conv"),
+        title: "New chat",
+        messages: [],
+        createdAt: Date.now(),
+      },
+    ];
   });
-  const [activeId, setActiveId] = useState<string>(() => localStorage.getItem(STORAGE_ACTIVE) || conversations[0].id);
-  const [pendingPrompt, setPendingPrompt] = useState<string | undefined>(undefined);
-  const [dark, setDark] = useState<boolean>(() => document.documentElement.classList.contains("dark"));
+  const [activeId, setActiveId] = useState<string>(
+    () => localStorage.getItem(STORAGE_ACTIVE) || conversations[0].id,
+  );
+  const [pendingPrompt, setPendingPrompt] = useState<string | undefined>(
+    undefined,
+  );
+  const [dark, setDark] = useState<boolean>(() =>
+    document.documentElement.classList.contains("dark"),
+  );
 
-  useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify(conversations)); }, [conversations]);
-  useEffect(() => { localStorage.setItem(STORAGE_ACTIVE, activeId); }, [activeId]);
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(conversations));
+  }, [conversations]);
+  useEffect(() => {
+    localStorage.setItem(STORAGE_ACTIVE, activeId);
+  }, [activeId]);
 
-  const active = useMemo(() => conversations.find((c) => c.id === activeId)!, [conversations, activeId]);
-  const activeGroup = useMemo(() => (active.groupId ?? active.id), [active]);
-  const siblings = useMemo(() => conversations.filter((c) => (c.groupId ?? c.id) === activeGroup), [conversations, activeGroup]);
+  const active = useMemo(
+    () => conversations.find((c) => c.id === activeId)!,
+    [conversations, activeId],
+  );
+  const activeGroup = useMemo(() => active.groupId ?? active.id, [active]);
+  const siblings = useMemo(
+    () => conversations.filter((c) => (c.groupId ?? c.id) === activeGroup),
+    [conversations, activeGroup],
+  );
 
   const setTheme = (enabled: boolean) => {
     setDark(enabled);
@@ -60,7 +107,12 @@ export default function Index() {
   const openConversation = (id: string) => setActiveId(id);
 
   const newChat = () => {
-    const c: Conversation = { id: uid("conv"), title: "New chat", messages: [], createdAt: Date.now() };
+    const c: Conversation = {
+      id: uid("conv"),
+      title: "New chat",
+      messages: [],
+      createdAt: Date.now(),
+    };
     setConversations((prev) => [c, ...prev]);
     setActiveId(c.id);
   };
@@ -69,20 +121,46 @@ export default function Index() {
     if (!conv.messages.some((m) => m.role === "user")) return;
     const title = summarizeTitle(conv.messages[0]?.content || conv.title);
     if (conv.title !== title) {
-      setConversations((prev) => prev.map((c) => (c.id === conv.id ? { ...c, title } : c)));
+      setConversations((prev) =>
+        prev.map((c) => (c.id === conv.id ? { ...c, title } : c)),
+      );
     }
   };
 
   const onSend = async (text: string) => {
-    const userMessage: Message = { id: uid("m"), role: "user", content: text, createdAt: Date.now() };
-    setConversations((prev) => prev.map((c) => (c.id === activeId ? { ...c, messages: [...c.messages, userMessage] } : c)));
+    const userMessage: Message = {
+      id: uid("m"),
+      role: "user",
+      content: text,
+      createdAt: Date.now(),
+    };
+    setConversations((prev) =>
+      prev.map((c) =>
+        c.id === activeId
+          ? { ...c, messages: [...c.messages, userMessage] }
+          : c,
+      ),
+    );
 
     const answer = await callModel(text);
-    const botMessage: Message = { id: uid("m"), role: "assistant", content: answer, createdAt: Date.now() };
-    setConversations((prev) => prev.map((c) => (c.id === activeId ? { ...c, messages: [...c.messages, botMessage] } : c)));
+    const botMessage: Message = {
+      id: uid("m"),
+      role: "assistant",
+      content: answer,
+      createdAt: Date.now(),
+    };
+    setConversations((prev) =>
+      prev.map((c) =>
+        c.id === activeId ? { ...c, messages: [...c.messages, botMessage] } : c,
+      ),
+    );
 
     const conv = conversations.find((c) => c.id === activeId);
-    if (conv) addToHistoryIfNeeded({ ...conv, messages: [...conv.messages, userMessage, botMessage] });
+    if (conv)
+      addToHistoryIfNeeded({
+        ...conv,
+        messages: [...conv.messages, userMessage, botMessage],
+      });
   };
 
   const onBranchFrom = (messageId: string) => {
@@ -93,18 +171,25 @@ export default function Index() {
     const baseGroup = current.groupId ?? current.id; // group to root
     const seed = current.messages.slice(0, idx + 1);
     const root = conversations.find((c) => c.id === baseGroup);
-    const existing = conversations.filter((c) => (c.groupId ?? c.id) === baseGroup);
+    const existing = conversations.filter(
+      (c) => (c.groupId ?? c.id) === baseGroup,
+    );
     const count = existing.filter((c) => c.parentId === baseGroup).length; // first-level branches count
     const newConv: Conversation = {
       id: uid("conv"),
-      title: summarizeTitle((root?.messages[0]?.content || root?.title || current.title) + ` (branch ${Math.max(1, count + 1)})`),
+      title: summarizeTitle(
+        (root?.messages[0]?.content || root?.title || current.title) +
+          ` (branch ${Math.max(1, count + 1)})`,
+      ),
       messages: seed,
       groupId: baseGroup,
       parentId: current.id,
       createdAt: Date.now(),
     };
 
-    setConversations((prev) => prev.map((c) => (c.id === baseGroup ? { ...c, groupId: baseGroup } : c)));
+    setConversations((prev) =>
+      prev.map((c) => (c.id === baseGroup ? { ...c, groupId: baseGroup } : c)),
+    );
     setConversations((prev) => [newConv, ...prev]);
     setActiveId(newConv.id);
   };
@@ -116,7 +201,12 @@ export default function Index() {
       const remaining = conversations.filter((c) => c.id !== id);
       if (remaining[0]) setActiveId(remaining[0].id);
       else {
-        const c: Conversation = { id: uid("conv"), title: "New chat", messages: [], createdAt: Date.now() };
+        const c: Conversation = {
+          id: uid("conv"),
+          title: "New chat",
+          messages: [],
+          createdAt: Date.now(),
+        };
         setConversations((prev) => [c, ...prev]);
         setActiveId(c.id);
       }
@@ -125,11 +215,16 @@ export default function Index() {
 
   const history = useMemo(() => {
     const seen = new Set<string>();
-    const ordered = conversations.filter((c) => c.messages.length > 0).sort((a,b)=> b.createdAt - a.createdAt);
+    const ordered = conversations
+      .filter((c) => c.messages.length > 0)
+      .sort((a, b) => b.createdAt - a.createdAt);
     const dedup: Conversation[] = [];
     for (const c of ordered) {
       const key = c.title.toLowerCase();
-      if (!seen.has(key)) { seen.add(key); dedup.push(c); }
+      if (!seen.has(key)) {
+        seen.add(key);
+        dedup.push(c);
+      }
     }
     return dedup;
   }, [conversations]);
@@ -142,18 +237,35 @@ export default function Index() {
             <div className="h-7 w-7 rounded-md bg-primary" />
             <div>
               <div className="font-semibold">JiraGPT</div>
-              <div className="text-xs text-muted-foreground">Deterministic prompts + branching chats</div>
+              <div className="text-xs text-muted-foreground">
+                Deterministic prompts + branching chats
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" aria-label="Toggle theme" onClick={() => setTheme(!dark)}>
-              {dark ? <SunMedium className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Toggle theme"
+              onClick={() => setTheme(!dark)}
+            >
+              {dark ? (
+                <SunMedium className="h-4 w-4" />
+              ) : (
+                <Moon className="h-4 w-4" />
+              )}
             </Button>
           </div>
         </div>
       </header>
 
-      <main className={cn("grid", "grid-cols-1 lg:grid-cols-[1fr,20rem]", "min-h-0")}>
+      <main
+        className={cn(
+          "grid",
+          "grid-cols-1 lg:grid-cols-[1fr,20rem]",
+          "min-h-0",
+        )}
+      >
         <div className="min-h-0 flex flex-col">
           <ChatArea
             conversation={active}

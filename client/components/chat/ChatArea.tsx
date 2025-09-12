@@ -16,7 +16,15 @@ interface ChatAreaProps {
   initialPrompt?: string;
 }
 
-export function ChatArea({ conversation, siblingConversations, onSend, onBranchFrom, onSwitchConversation, onCloseConversation, initialPrompt }: ChatAreaProps) {
+export function ChatArea({
+  conversation,
+  siblingConversations,
+  onSend,
+  onBranchFrom,
+  onSwitchConversation,
+  onCloseConversation,
+  initialPrompt,
+}: ChatAreaProps) {
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
   const bottomRef = useRef<HTMLDivElement | null>(null);
@@ -30,14 +38,28 @@ export function ChatArea({ conversation, siblingConversations, onSend, onBranchF
   }, [initialPrompt]);
 
   const groupHeadId = conversation.groupId ?? conversation.id;
-  const base = useMemo(() => siblingConversations.find((c) => c.id === groupHeadId) || conversation, [siblingConversations, groupHeadId, conversation]);
-  const branches = useMemo(() => siblingConversations.filter((c) => c.id !== groupHeadId), [siblingConversations, groupHeadId]);
+  const base = useMemo(
+    () =>
+      siblingConversations.find((c) => c.id === groupHeadId) || conversation,
+    [siblingConversations, groupHeadId, conversation],
+  );
+  const branches = useMemo(
+    () => siblingConversations.filter((c) => c.id !== groupHeadId),
+    [siblingConversations, groupHeadId],
+  );
 
-  const firstLevelCount = useMemo(() => branches.filter((c) => c.parentId === base.id).length, [branches, base.id]);
+  const firstLevelCount = useMemo(
+    () => branches.filter((c) => c.parentId === base.id).length,
+    [branches, base.id],
+  );
 
   const tabs = useMemo(() => {
-    if (branches.length === 0) return [] as { id: string; label: React.ReactNode; closable?: boolean }[];
-    const branchTabs = branches.map((c, i) => ({ id: c.id, label: `B${i + 1}` }));
+    if (branches.length === 0)
+      return [] as { id: string; label: React.ReactNode; closable?: boolean }[];
+    const branchTabs = branches.map((c, i) => ({
+      id: c.id,
+      label: `B${i + 1}`,
+    }));
     const mainLabel = (
       <span className="flex items-center gap-2">
         <FolderWithSubs count={firstLevelCount} />
@@ -63,18 +85,31 @@ export function ChatArea({ conversation, siblingConversations, onSend, onBranchF
     <section className="flex-1 flex flex-col">
       {tabs.length > 0 && (
         <div className="border-b bg-card">
-          <TabBar tabs={tabs} activeId={conversation.id} onChange={onSwitchConversation} onClose={(id)=> id===base.id? undefined : onCloseConversation(id)} />
+          <TabBar
+            tabs={tabs}
+            activeId={conversation.id}
+            onChange={onSwitchConversation}
+            onClose={(id) =>
+              id === base.id ? undefined : onCloseConversation(id)
+            }
+          />
         </div>
       )}
       <ScrollArea className="flex-1">
         <div className="p-6 space-y-4">
           {conversation.messages.length === 0 && (
             <div className="text-center text-muted-foreground text-sm">
-              Start by selecting a deterministic query on the right or type your own prompt below.
+              Start by selecting a deterministic query on the right or type your
+              own prompt below.
             </div>
           )}
           {conversation.messages.map((m) => (
-            <MessageBubble key={m.id} message={m} onBranch={() => onBranchFrom(m.id)} allowBranch={true} />
+            <MessageBubble
+              key={m.id}
+              message={m}
+              onBranch={() => onBranchFrom(m.id)}
+              allowBranch={true}
+            />
           ))}
           <div ref={bottomRef} />
         </div>
@@ -93,8 +128,16 @@ export function ChatArea({ conversation, siblingConversations, onSend, onBranchF
               }
             }}
           />
-          <Button onClick={handleSend} disabled={isSending} className="h-[56px] px-4">
-            {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
+          <Button
+            onClick={handleSend}
+            disabled={isSending}
+            className="h-[56px] px-4"
+          >
+            {isSending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <ArrowRight className="h-4 w-4" />
+            )}
           </Button>
         </div>
       </div>
@@ -108,27 +151,50 @@ function FolderWithSubs({ count }: { count: number }) {
     <span className="relative inline-flex items-center">
       <Folder className="h-4 w-4 text-primary" />
       {Array.from({ length: minis }).map((_, i) => (
-        <Folder key={i} className="h-3 w-3 text-accent absolute" style={{ left: 10 + i * 6, bottom: -2 - i * 2, opacity: 0.9 }} />
+        <Folder
+          key={i}
+          className="h-3 w-3 text-accent absolute"
+          style={{ left: 10 + i * 6, bottom: -2 - i * 2, opacity: 0.9 }}
+        />
       ))}
       {count > 3 && (
-        <span className="ml-[28px] text-[10px] leading-none rounded-sm bg-secondary px-1 py-0.5 text-secondary-foreground">+{count - 3}</span>
+        <span className="ml-[28px] text-[10px] leading-none rounded-sm bg-secondary px-1 py-0.5 text-secondary-foreground">
+          +{count - 3}
+        </span>
       )}
     </span>
   );
 }
 
-function MessageBubble({ message, onBranch, allowBranch }: { message: Message; onBranch: () => void; allowBranch: boolean }) {
+function MessageBubble({
+  message,
+  onBranch,
+  allowBranch,
+}: {
+  message: Message;
+  onBranch: () => void;
+  allowBranch: boolean;
+}) {
   const isUser = message.role === "user";
   return (
     <div className={isUser ? "flex justify-end" : "flex justify-start"}>
-      <div className={
-        (isUser ? "bg-primary text-primary-foreground" : "bg-card text-foreground border") +
-        " max-w-[80%] rounded-lg px-4 py-3 shadow-sm"
-      }>
-        <div className="whitespace-pre-wrap text-sm leading-relaxed">{message.content}</div>
+      <div
+        className={
+          (isUser
+            ? "bg-primary text-primary-foreground"
+            : "bg-card text-foreground border") +
+          " max-w-[80%] rounded-lg px-4 py-3 shadow-sm"
+        }
+      >
+        <div className="whitespace-pre-wrap text-sm leading-relaxed">
+          {message.content}
+        </div>
         {!isUser && allowBranch && (
           <div className="mt-2 text-xs text-muted-foreground flex items-center gap-2">
-            <button className="inline-flex items-center gap-1 hover:underline" onClick={onBranch}>
+            <button
+              className="inline-flex items-center gap-1 hover:underline"
+              onClick={onBranch}
+            >
               <GitBranch className="h-3.5 w-3.5" /> Branch
             </button>
           </div>
