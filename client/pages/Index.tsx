@@ -88,13 +88,19 @@ export default function Index() {
   const onBranchFrom = (messageId: string) => {
     const base = conversations.find((c) => c.id === activeId);
     if (!base) return;
+    if (base.groupId) {
+      // Only one level of branching allowed
+      try { const { toast } = require("sonner"); toast?.message?.("Only one level of branching allowed"); } catch {}
+      return;
+    }
     const idx = base.messages.findIndex((m) => m.id === messageId);
     if (idx < 0) return;
-    const baseGroup = base.groupId ?? base.id;
+    const baseGroup = base.id; // ensure group is the original
     const seed = base.messages.slice(0, idx + 1);
+    const count = conversations.filter((c) => (c.groupId ?? c.id) === baseGroup).length - 1; // existing branches count
     const newConv: Conversation = {
       id: uid("conv"),
-      title: summarizeTitle((base.messages[0]?.content || base.title) + ` (branch ${siblings.length})`),
+      title: summarizeTitle((base.messages[0]?.content || base.title) + ` (branch ${Math.max(1, count + 1)})`),
       messages: seed,
       groupId: baseGroup,
       createdAt: Date.now(),
