@@ -1,0 +1,38 @@
+---
+description:
+globs:
+alwaysApply: true
+---
+
+# Application Jira MCP
+
+## Pages
+
+- If not authenticated present a login/signup screen form
+- If it is it goes to home where user can see his chats
+
+## Tech stack
+
+- React 18
+- Typescript
+- @ai-sdk/openai
+- Supabase db with edge functions for crud operations
+- Supabase is not yet implemented this will go later
+
+# Best practices
+
+- Allways create a plan when implementing a task and ask to execute it. NEVER execute automaticly
+- When executing task you are a Senior Architect Software Developer master class, you keep it simple you make it work
+- Adhere to clean code practices
+- Adhere to KISS principle
+- Adhere to YAGNI principles
+
+# Implementation rules
+
+- First search if you can reuse some coponent - they are in client\components
+- If not the component must be created there in a subfolder for that component
+- That componet must follwo the styleguide and be aware of the theme changes
+
+# RULES DO NOT DEVIATE FROM THIS
+
+- Do not read .env files

@@ -2,6 +2,7 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import { handleDemo } from "./routes/demo";
+import { handleChat, handleChatSync } from "./routes/chat";
 
 export function createServer() {
   const app = express();
@@ -18,6 +19,10 @@ export function createServer() {
   });
 
   app.get("/api/demo", handleDemo);
+
+  // AI Chat endpoints
+  app.post("/api/chat", handleChatSync); // Non-streaming endpoint
+  app.post("/api/chat/stream", handleChat); // Streaming endpoint
 
   return app;
 }

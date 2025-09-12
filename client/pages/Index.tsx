@@ -48,10 +48,115 @@ function summarizeTitle(text: string) {
   return clean.length > 60 ? clean.slice(0, 57) + "…" : clean || "New chat";
 }
 
-function callModel(prompt: string): Promise<string> {
-  // Simple deterministic mock for demo purposes
-  const reply = `Here is an analysis for: "${prompt}"\n\n— Key points\n• ${prompt.split(" ").slice(0, 6).join(" ")}\n• Next steps suggested.\n\nYou can branch from this message to explore alternatives.`;
-  return new Promise((res) => setTimeout(() => res(reply), 500));
+async function callModel(
+  prompt: string,
+  conversationHistory: Message[] = [],
+): Promise<string> {
+  try {
+    // Convert conversation history to the API format
+    const messages = conversationHistory.map((msg) => ({
+      role: msg.role,
+      content: msg.content,
+    }));
+
+    // Add the current prompt as a user message
+    messages.push({
+      role: "user" as const,
+      content: prompt,
+    });
+
+    const response = await fetch("/api/chat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messages,
+        systemPrompt:
+          "You are JiraGPT, a helpful assistant specialized in project management, Jira workflows, and providing actionable insights for software development teams. Provide detailed analysis and practical suggestions.",
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.message;
+  } catch (error) {
+    console.error("Error calling AI model:", error);
+    // Fallback to a helpful error message
+    return `I'm sorry, I'm currently unable to process your request. This might be due to a network issue or the AI service being temporarily unavailable. Please try again in a moment.
+
+If the problem persists, you can still use the branching feature to explore different conversation paths with your previous messages.`;
+  }
+}
+
+async function callModelStreaming(
+  prompt: string,
+  conversationHistory: Message[] = [],
+  onUpdate: (chunk: string) => void,
+): Promise<string> {
+  try {
+    // Convert conversation history to the API format
+    const messages = conversationHistory.map((msg) => ({
+      role: msg.role,
+      content: msg.content,
+    }));
+
+    // Add the current prompt as a user message
+    messages.push({
+      role: "user" as const,
+      content: prompt,
+    });
+
+    const response = await fetch("/api/chat/stream", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messages,
+        systemPrompt:
+          "You are JiraGPT, a helpful assistant specialized in project management, Jira workflows, and providing actionable insights for software development teams. Provide detailed analysis and practical suggestions.",
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    if (!response.body) {
+      throw new Error("Response body is null");
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let fullText = "";
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        fullText += chunk;
+        onUpdate(chunk);
+      }
+    } finally {
+      reader.releaseLock();
+    }
+
+    return fullText;
+  } catch (error) {
+    console.error("Error calling AI model:", error);
+    // Fallback to a helpful error message
+    const fallbackMessage = `I'm sorry, I'm currently unable to process your request. This might be due to a network issue or the AI service being temporarily unavailable. Please try again in a moment.
+
+If the problem persists, you can still use the branching feature to explore different conversation paths with your previous messages.`;
+    onUpdate(fallbackMessage);
+    return fallbackMessage;
+  }
 }
 
 const STORAGE_KEY = "jira-gpt-conversations";
@@ -134,33 +239,74 @@ export default function Index() {
       content: text,
       createdAt: Date.now(),
     };
+
+    // Create bot message placeholder for streaming
+    const botMessageId = uid("m");
+    const botMessage: Message = {
+      id: botMessageId,
+      role: "assistant",
+      content: "",
+      createdAt: Date.now(),
+    };
+
+    // Add user message and empty bot message immediately
     setConversations((prev) =>
       prev.map((c) =>
         c.id === activeId
-          ? { ...c, messages: [...c.messages, userMessage] }
+          ? { ...c, messages: [...c.messages, userMessage, botMessage] }
           : c,
       ),
     );
 
-    const answer = await callModel(text);
-    const botMessage: Message = {
-      id: uid("m"),
-      role: "assistant",
-      content: answer,
-      createdAt: Date.now(),
-    };
+    // Get current conversation to pass as context
+    const currentConv = conversations.find((c) => c.id === activeId);
+    const conversationHistory = currentConv ? currentConv.messages : [];
+
+    // Stream the response
+    const fullAnswer = await callModelStreaming(
+      text,
+      conversationHistory,
+      (chunk: string) => {
+        // Update the bot message content in real-time
+        setConversations((prev) =>
+          prev.map((c) =>
+            c.id === activeId
+              ? {
+                  ...c,
+                  messages: c.messages.map((m) =>
+                    m.id === botMessageId
+                      ? { ...m, content: m.content + chunk }
+                      : m,
+                  ),
+                }
+              : c,
+          ),
+        );
+      },
+    );
+
+    // Final update to ensure we have the complete message
     setConversations((prev) =>
       prev.map((c) =>
-        c.id === activeId ? { ...c, messages: [...c.messages, botMessage] } : c,
+        c.id === activeId
+          ? {
+              ...c,
+              messages: c.messages.map((m) =>
+                m.id === botMessageId ? { ...m, content: fullAnswer } : m,
+              ),
+            }
+          : c,
       ),
     );
 
     const conv = conversations.find((c) => c.id === activeId);
-    if (conv)
+    if (conv) {
+      const finalBotMessage = { ...botMessage, content: fullAnswer };
       addToHistoryIfNeeded({
         ...conv,
-        messages: [...conv.messages, userMessage, botMessage],
+        messages: [...conv.messages, userMessage, finalBotMessage],
       });
+    }
   };
 
   const onBranchFrom = (messageId: string) => {
