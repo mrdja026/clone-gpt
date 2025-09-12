@@ -140,6 +140,7 @@ The onboarding page lets you try a prompt and see a streaming response. After th
 - On first streamed response, the conversation is saved and you are redirected to `/chat`.
 
 Key files:
+
 - `client/pages/PostLogin.tsx` – onboarding page (hero + search + chat)
 - `client/components/QuerySearch.tsx` – lookahead search component
 - `client/lib/queries.ts` – shared deterministic query templates
@@ -355,7 +356,7 @@ Added full OAuth 2.0 client credentials support for JIRA Cloud integration to re
 const JIRA_CONFIG = {
   // Basic Auth (fallback)
   baseUrl: process.env.JIRA_BASE_URL || "https://mrdjanstajic.atlassian.net",
-  email: process.env.JIRA_EMAIL || "mrdjanstajic@gmail.com", 
+  email: process.env.JIRA_EMAIL || "mrdjanstajic@gmail.com",
   apiToken: process.env.JIRA_API_TOKEN || "",
   // OAuth 2.0 (preferred)
   oauthClientId: process.env.JIRA_OAUTH_CLIENT_ID || "",
@@ -463,12 +464,14 @@ LOG_LEVEL=debug
 OAuth 2.0 authentication is working but returns 403 Forbidden errors due to insufficient scopes in the Atlassian OAuth app configuration.
 
 **Current Status:**
+
 - ✅ OAuth token generation successful
-- ✅ CloudId discovery implemented  
+- ✅ CloudId discovery implemented
 - ✅ Bearer authentication working
 - ❌ Missing required JIRA scopes causing 403 errors
 
 **Required Actions:**
+
 1. Configure OAuth app in Atlassian Developer Console (https://developer.atlassian.com/console/myapps/)
 2. Add required scopes:
    - `read:jira-work` (for reading issues)
@@ -481,6 +484,7 @@ OAuth 2.0 authentication is working but returns 403 Forbidden errors due to insu
 The test ticket SCRUM-8 doesn't exist in the JIRA instance, causing "not found" errors even with proper authentication.
 
 **Solution Needed:**
+
 - Create actual JIRA issues for testing
 - Or implement issue creation in MCP tools
 - Or use existing ticket IDs from your JIRA instance
@@ -527,6 +531,108 @@ curl -sS -X POST http://localhost:8080/api/mcp/tool \
 ### Technical Notes
 
 The core MCP integration is functional - the stdio communication, query matching, and data formatting all work correctly. The primary blocker is the AI SDK configuration for Ollama compatibility.
+
+## MCP HTTP Integration Migration (Problem, Solution, Cost, Tests)
+
+### Problem we solved
+
+- MCP ran only via STDIO and was proxied through a legacy Express integration bundled in Vite dev server. This caused:
+  - Environment variable inheritance issues (tokens not reliably available to the MCP subprocess)
+  - Poor observability (stdio-only logs, hard to trace)
+  - CORS/origin confusion and port conflicts during dev
+  - NestJS vs Express duplication of API surfaces
+  - Fragile dev wiring (accidental double `/api/api` paths, controller DI context issues, ESM `__dirname` problems, and headers-sent warnings)
+
+### What we changed
+
+- Consolidated on NestJS for the API surface and removed the legacy Express wiring from Vite.
+- Added middlewares to NestJS MCP routes:
+  - `verifyMcpJwt` (JWT optional in dev, enforced when `MCP_JWT_SECRET` is set)
+  - `measureMcpLatency` (adds timing logs; soft SLO < 60s)
+- Updated `McpService`:
+  - Primary path: JSON‑RPC over HTTP to MCP endpoint if configured
+  - Fallback: STDIO client transport when HTTP MCP is unavailable (dev-friendly)
+  - Fixed DI with explicit `@Inject(ConfigService)` and ESM `__dirname` via `fileURLToPath`
+- Vite now proxies `/api` to Nest (port 3001) for a single origin in dev; UI stays on `http://localhost:8080`.
+
+### Cost (trade‑offs and effort)
+
+- Engineering effort: ~1–2 days of refactor + debugging (DI, ESM pathing, dev scripts, proxy, JWT)
+- Added dependencies: `jsonwebtoken` and its types
+- Operational trade‑off: separate MCP HTTP service is optional; when used, must run on a port different from Nest; otherwise STDIO fallback is used in dev
+- Benefit: clear API boundary, better observability, JWT guard path to production, no Express-in-Vite coupling
+
+### How to run (dev)
+
+PowerShell
+
+```powershell
+# 1) Start Nest (API) on 3001
+$env:PORT = 3001
+pnpm dev:server
+
+# 2) In a second terminal, start Vite (UI) on 8080
+pnpm exec vite
+```
+
+Vite proxies `/api/*` → `http://localhost:3001/*`.
+
+### Optional auth (JWT)
+
+```powershell
+$env:MCP_JWT_SECRET = "dev-secret"
+$env:MCP_JWT = node -e "console.log(require('jsonwebtoken').sign({ sub:'dev-user' }, process.env.MCP_JWT_SECRET, { expiresIn:'1h' }))"
+```
+
+### Optional HTTP MCP
+
+- Default dev uses STDIO fallback. To use HTTP MCP instead, run it on a different port (e.g., 3101) and set:
+
+```powershell
+$env:MCP_BASE_URL = "http://localhost:3101"
+```
+
+### Test scripts (PowerShell)
+
+Health
+
+```powershell
+Invoke-RestMethod -Uri "http://localhost:3001/api/ping"
+Invoke-RestMethod -Uri "http://localhost:8080/api/ping"
+```
+
+List MCP tools (through Nest)
+
+```powershell
+# Without JWT
+Invoke-RestMethod -Uri "http://localhost:3001/api/mcp/tools"
+
+# With JWT
+$hdr = @{ Authorization = "Bearer $env:MCP_JWT" }
+Invoke-RestMethod -Uri "http://localhost:3001/api/mcp/tools" -Headers $hdr
+
+# Via Vite proxy
+Invoke-RestMethod -Uri "http://localhost:8080/api/mcp/tools" -Headers $hdr
+```
+
+Call a tool
+
+```powershell
+$body = @{ name = "jira_whoami"; arguments = @{} } | ConvertTo-Json -Compress
+Invoke-RestMethod -Uri "http://localhost:3001/api/mcp/tool" -Method Post -ContentType "application/json" -Headers $hdr -Body $body
+```
+
+Read a resource
+
+```powershell
+$body = @{ uri = "mcp://local-mcp-server/jira/projects" } | ConvertTo-Json -Compress
+Invoke-RestMethod -Uri "http://localhost:3001/api/mcp/resource" -Method Post -ContentType "application/json" -Headers $hdr -Body $body
+```
+
+SLO/observability
+
+- Responses include timing in logs; violations print `MCP_SLO_VIOLATION` if > 60s.
+- Check server logs while invoking endpoints.
 
 ## License
 
