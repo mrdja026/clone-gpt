@@ -1,6 +1,9 @@
+import "reflect-metadata";
 import { NestFactory } from "@nestjs/core";
 import { ValidationPipe } from "@nestjs/common";
 import { AppModule } from "./app.module";
+import { verifyMcpJwt } from "./middleware/jwt";
+import { measureMcpLatency } from "./middleware/timing";
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -10,6 +13,9 @@ async function bootstrap() {
     origin: true,
     credentials: true,
   });
+
+  // Apply middlewares to MCP routes
+  app.use("/api/mcp", measureMcpLatency, verifyMcpJwt);
 
   // Enable global validation
   app.useGlobalPipes(

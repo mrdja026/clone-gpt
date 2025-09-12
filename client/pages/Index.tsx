@@ -5,6 +5,7 @@ import { ChatArea } from "@/components/chat/ChatArea";
 import type { Conversation, Message } from "@/components/chat/types";
 import { cn } from "@/lib/utils";
 import { Moon, SunMedium } from "lucide-react";
+import { Link } from "react-router-dom";
 import { matchQuery, formatMCPResponse } from "@/lib/query-matcher";
 import { mcpClient } from "@/lib/mcp-client";
 
@@ -479,6 +480,18 @@ export default function Index() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <Link
+              to="/"
+              className="text-sm text-muted-foreground hover:text-foreground"
+            >
+              Home
+            </Link>
+            <Link
+              to="/about"
+              className="text-sm text-muted-foreground hover:text-foreground"
+            >
+              About
+            </Link>
             <Button
               variant="ghost"
               size="icon"
