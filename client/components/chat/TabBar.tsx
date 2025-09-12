@@ -1,7 +1,7 @@
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { X } from "lucide-react";
 
-interface TabInfo { id: string; label: string; }
+interface TabInfo { id: string; label: string; closable?: boolean }
 
 interface TabBarProps {
   tabs: TabInfo[];
@@ -17,7 +17,7 @@ export function TabBar({ tabs, activeId, onChange, onClose }: TabBarProps) {
         {tabs.map((t) => (
           <TabsTrigger key={t.id} value={t.id} className="relative pr-7">
             {t.label}
-            {onClose && (
+            {onClose && t.closable !== false && (
               <button
                 aria-label="Close tab"
                 onClick={(e) => { e.stopPropagation(); onClose(t.id); }}
