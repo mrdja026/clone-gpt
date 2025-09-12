@@ -63,7 +63,6 @@ export function ChatArea({ conversation, siblingConversations, onSend, onBranchF
     <section className="flex-1 flex flex-col">
       {tabs.length > 0 && (
         <div className="border-b bg-card">
-          <div className="px-4 pt-2 text-xs text-muted-foreground">{base.title}</div>
           <TabBar tabs={tabs} activeId={conversation.id} onChange={onSwitchConversation} onClose={(id)=> id===base.id? undefined : onCloseConversation(id)} />
         </div>
       )}
