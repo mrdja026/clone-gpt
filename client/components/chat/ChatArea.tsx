@@ -34,9 +34,9 @@ export function ChatArea({ conversation, siblingConversations, onSend, onBranchF
   const branches = useMemo(() => siblingConversations.filter((c) => c.id !== groupHeadId), [siblingConversations, groupHeadId]);
 
   const tabs = useMemo(() => {
-    if (branches.length === 0) return [] as { id: string; label: string }[];
+    if (branches.length === 0) return [] as { id: string; label: string; closable?: boolean }[];
     const branchTabs = branches.map((c, i) => ({ id: c.id, label: `B${i + 1}` }));
-    return [{ id: base.id, label: "Original" }, ...branchTabs];
+    return [{ id: base.id, label: "Original", closable: false }, ...branchTabs];
   }, [branches, base.id]);
 
   const handleSend = async () => {
