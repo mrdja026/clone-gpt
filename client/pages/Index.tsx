@@ -5,7 +5,6 @@ import { ChatArea } from "@/components/chat/ChatArea";
 import type { Conversation, Message } from "@/components/chat/types";
 import type { QueryTemplate } from "@/components/chat/types";
 import { cn } from "@/lib/utils";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Moon, SunMedium } from "lucide-react";
 
 const deterministicQueries: QueryTemplate[] = [
@@ -27,7 +26,7 @@ function summarizeTitle(text: string) {
 
 function callModel(prompt: string): Promise<string> {
   // Simple deterministic mock for demo purposes
-  const reply = `Here is an analysis for: "${prompt}"\n\n— Key points\n• ${prompt.split(" ").slice(0, 6).join(" ")}\n�� Next steps suggested.\n\nYou can branch from this message to explore alternatives.`;
+  const reply = `Here is an analysis for: "${prompt}"\n\n— Key points\n• ${prompt.split(" ").slice(0, 6).join(" ")}\n• Next steps suggested.\n\nYou can branch from this message to explore alternatives.`;
   return new Promise((res) => setTimeout(() => res(reply), 500));
 }
 
