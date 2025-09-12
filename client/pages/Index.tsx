@@ -27,7 +27,7 @@ function summarizeTitle(text: string) {
 
 function callModel(prompt: string): Promise<string> {
   // Simple deterministic mock for demo purposes
-  const reply = `Here is an analysis for: "${prompt}"\n\n— Key points\n• ${prompt.split(" ").slice(0, 6).join(" ")}\n• Next steps suggested.\n\nYou can branch from this message to explore alternatives.`;
+  const reply = `Here is an analysis for: "${prompt}"\n\n— Key points\n• ${prompt.split(" ").slice(0, 6).join(" ")}\n�� Next steps suggested.\n\nYou can branch from this message to explore alternatives.`;
   return new Promise((res) => setTimeout(() => res(reply), 500));
 }
 
@@ -120,7 +120,16 @@ export default function Index() {
     }
   };
 
-  const history = useMemo(() => conversations.filter((c) => c.messages.length > 0).sort((a,b)=> b.createdAt - a.createdAt), [conversations]);
+  const history = useMemo(() => {
+    const seen = new Set<string>();
+    const ordered = conversations.filter((c) => c.messages.length > 0).sort((a,b)=> b.createdAt - a.createdAt);
+    const dedup: Conversation[] = [];
+    for (const c of ordered) {
+      const key = c.title.toLowerCase();
+      if (!seen.has(key)) { seen.add(key); dedup.push(c); }
+    }
+    return dedup;
+  }, [conversations]);
 
   return (
     <div className="min-h-screen grid grid-rows-[auto,1fr]">
