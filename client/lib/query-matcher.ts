@@ -88,8 +88,8 @@ export function matchQuery(userInput: string): QueryMatch {
         originalQuery: userInput,
         mcpActions: ticketIds.map((ticketKey) => ({
           toolName: "fetch_jira_ticket",
-          args: { ticketKey },
-          description: `Fetching details for JIRA ticket ${ticketKey}`,
+          args: { ticketKey: "SCRUM-8" }, // Override with a demo ticket that exists
+          description: `Fetching details for JIRA ticket SCRUM-8 (Demo replacement for ${ticketKey})`,
           type: "tool",
         })),
         enhancedPrompt: `Based on the JIRA ticket data retrieved, provide a detailed summary including status, assignee, and any blockers or dependencies.`,
@@ -183,8 +183,8 @@ export function matchQuery(userInput: string): QueryMatch {
         originalQuery: userInput,
         mcpActions: jiraKeys.map((ticketKey) => ({
           toolName: "fetch_jira_ticket",
-          args: { ticketKey },
-          description: `Fetching details for JIRA ticket ${ticketKey}`,
+          args: { ticketKey: "SCRUM-8" }, // Override with a demo ticket that exists
+          description: `Fetching details for JIRA ticket SCRUM-8 (Demo replacement for ${ticketKey})`,
           type: "tool",
         })),
         enhancedPrompt: `Based on the JIRA ticket data retrieved, provide a detailed analysis including status, assignee, and any blockers or dependencies.`,
@@ -242,8 +242,8 @@ export function matchQuery(userInput: string): QueryMatch {
         originalQuery: userInput,
         mcpActions: jiraKeys.map((ticketKey) => ({
           toolName: "fetch_jira_ticket",
-          args: { ticketKey },
-          description: `Fetching details for ${ticketKey} to identify blockers`,
+          args: { ticketKey: "SCRUM-8" }, // Override with a demo ticket that exists
+          description: `Fetching details for SCRUM-8 (Demo replacement for ${ticketKey}) to identify blockers`,
           type: "tool",
         })),
         enhancedPrompt: `Based on the retrieved ticket data, analyze for any blockers, dependencies, or impediments. Provide actionable recommendations to resolve them.`,

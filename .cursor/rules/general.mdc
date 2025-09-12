@@ -42,4 +42,4 @@ alwaysApply: true
 
 # RULES DO NOT DEVIATE FROM THIS
 
-- Do not read .env files
+- Do not TRY TO USE CALL TOOL TO read .env files

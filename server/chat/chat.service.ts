@@ -1,12 +1,14 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { streamText } from "ai";
-import { createOpenAI } from "@ai-sdk/openai";
+import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
+
 import { ChatRequestDto, ChatResponseDto } from "./dto/chat.dto";
 
-// Configure OpenAI-compatible provider (works with Ollama)
-const ollama = createOpenAI({
-  apiKey: process.env.OPENAI_API_KEY || "branko:latest",
+// Configure provider for Ollama's OpenAI-compatible endpoint
+const ollama = createOpenAICompatible({
   baseURL: process.env.OPENAI_BASE_URL || "http://127.0.0.1:11434/v1",
+  name: "ollama",
+  apiKey: process.env.OPENAI_API_KEY || "ollama",
 });
 
 const modelName = process.env.MODEL_NAME || "llama3.1:latest";
@@ -21,7 +23,7 @@ export class ChatService {
     this.logger.log(`Processing chat request with ${messages.length} messages`);
 
     const result = streamText({
-      model: ollama(modelName), // Using local Ollama model
+      model: ollama.chatModel(modelName), // Use chatModel for OpenAI chat completions format
       system:
         systemPrompt ||
         "You are a helpful assistant that provides detailed analysis and suggestions for project management queries.",
@@ -43,7 +45,7 @@ export class ChatService {
     );
 
     const result = await streamText({
-      model: ollama(modelName),
+      model: ollama.chatModel(modelName),
       system:
         systemPrompt ||
         "You are a helpful assistant that provides detailed analysis and suggestions for project management queries.",

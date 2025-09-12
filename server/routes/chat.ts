@@ -1,14 +1,25 @@
 import { RequestHandler } from "express";
 import { streamText } from "ai";
-import { createOpenAI } from "@ai-sdk/openai";
+import { createOllama } from "ollama-ai-provider-v2";
 
-// Configure OpenAI-compatible provider (works with Ollama)
-const ollama = createOpenAI({
-  apiKey: process.env.OPENAI_API_KEY || "ollama",
-  baseURL: process.env.OPENAI_BASE_URL || "http://127.0.0.1:11434/v1",
+// Configure Ollama provider (local OpenAI-compatible server)
+const rawBaseUrl =
+  process.env.OLLAMA_BASE_URL ||
+  process.env.OPENAI_BASE_URL ||
+  "http://127.0.0.1:11434";
+
+// Normalize: remove trailing /v1 if present, and ensure /api suffix exists
+const normalizedBaseUrl = (() => {
+  const trimmed = rawBaseUrl.replace(/\/v1$/, "");
+  return trimmed.endsWith("/api") ? trimmed : `${trimmed}/api`;
+})();
+
+const ollama = createOllama({
+  baseURL: normalizedBaseUrl,
 });
 
-const modelName = process.env.MODEL_NAME || "llama3.1:latest";
+// Use model name from environment or default to a locally available model
+const modelName = process.env.MODEL_NAME || "branko:latest";
 
 export interface ChatMessage {
   role: "user" | "assistant";
@@ -62,9 +73,24 @@ export const handleChat: RequestHandler = async (req, res) => {
     res.end();
   } catch (error) {
     console.error("Chat API error:", error);
+    // Extract the cause if available and add to response
+    const errorCause =
+      error && typeof error === "object" && "cause" in error
+        ? (error as any).cause
+        : undefined;
     res.status(500).json({
       error: "Failed to process chat request",
       message: error instanceof Error ? error.message : "Unknown error",
+      cause: errorCause
+        ? String(errorCause)
+        : "Ollama provider error or model not compatible. Verify model name and provider.",
+      details:
+        error && typeof error === "object"
+          ? Object.getOwnPropertyNames(error).reduce((obj: any, key) => {
+              obj[key] = String((error as any)[key]);
+              return obj;
+            }, {})
+          : {},
     });
   }
 };
@@ -98,9 +124,9 @@ export const handleChatSync: RequestHandler = async (req, res) => {
       message: fullText,
       usage: usage
         ? {
-            promptTokens: usage.inputTokens || 0,
-            completionTokens: usage.outputTokens || 0,
-            totalTokens: usage.totalTokens || 0,
+            promptTokens: (usage as any).inputTokens || 0,
+            completionTokens: (usage as any).outputTokens || 0,
+            totalTokens: (usage as any).totalTokens || 0,
           }
         : undefined,
     };
@@ -108,9 +134,24 @@ export const handleChatSync: RequestHandler = async (req, res) => {
     res.json(response);
   } catch (error) {
     console.error("Chat API error:", error);
+    // Extract the cause if available and add to response
+    const errorCause =
+      error && typeof error === "object" && "cause" in error
+        ? (error as any).cause
+        : undefined;
     res.status(500).json({
       error: "Failed to process chat request",
       message: error instanceof Error ? error.message : "Unknown error",
+      cause: errorCause
+        ? String(errorCause)
+        : "Ollama provider error or model not compatible. Verify model name and provider.",
+      details:
+        error && typeof error === "object"
+          ? Object.getOwnPropertyNames(error).reduce((obj: any, key) => {
+              obj[key] = String((error as any)[key]);
+              return obj;
+            }, {})
+          : {},
     });
   }
 };

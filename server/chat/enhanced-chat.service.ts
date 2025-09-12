@@ -1,19 +1,21 @@
 import { Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { streamText } from "ai";
-import { createOpenAI } from "@ai-sdk/openai";
+import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { ChatRequestDto, ChatResponseDto } from "./dto/chat.dto";
 import { ChatsService } from "../services/chats.service";
 import { MessagesService } from "../services/messages.service";
 import { CreateChatDto } from "../entities/chat.entity";
 import { CreateMessageDto } from "../entities/message.entity";
 
-// Configure OpenAI-compatible provider (works with Ollama)
-const ollama = createOpenAI({
-  apiKey: process.env.OPENAI_API_KEY || "branko:latest",
+// Configure provider for Ollama's OpenAI-compatible endpoint
+const ollama = createOpenAICompatible({
   baseURL: process.env.OPENAI_BASE_URL || "http://127.0.0.1:11434/v1",
+  name: "ollama",
+  apiKey: process.env.OPENAI_API_KEY || "ollama",
 });
 
-const modelName = process.env.MODEL_NAME || "llama3.1:latest";
+// Downgrade to AI SDK 1.x compatible model format
+const modelName = process.env.MODEL_NAME || "llama2";
 
 export interface PersistentChatRequestDto extends ChatRequestDto {
   chatId?: string;
@@ -98,7 +100,7 @@ export class EnhancedChatService {
 
     // Generate streaming response
     const result = streamText({
-      model: ollama(modelName),
+      model: ollama.chatModel(modelName),
       system:
         systemPrompt ||
         "You are JiraGPT, a helpful assistant specialized in project management, Jira workflows, and providing actionable insights for software development teams. Provide detailed analysis and practical suggestions.",
@@ -166,7 +168,7 @@ export class EnhancedChatService {
 
     // Generate response
     const result = await streamText({
-      model: ollama(modelName),
+      model: ollama.chatModel(modelName),
       system:
         systemPrompt ||
         "You are JiraGPT, a helpful assistant specialized in project management, Jira workflows, and providing actionable insights for software development teams. Provide detailed analysis and practical suggestions.",

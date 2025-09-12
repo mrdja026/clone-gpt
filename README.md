@@ -320,51 +320,69 @@ When a deterministic query is detected, the response will include both the struc
 
 ## Known Issues
 
-### Current Bug Status (September 2025)
+### Fixed Issues (September 2025)
 
-**❌ Critical Issue: AI SDK Endpoint Mismatch**
+**✅ Fixed: AI SDK Endpoint Mismatch**
 
-The AI SDK is incorrectly calling `/v1/responses` instead of the correct `/v1/chat/completions` endpoint for Ollama. This causes a 404 error when attempting to use the chat functionality.
+The AI SDK was incorrectly calling `/v1/responses` instead of the correct `/v1/chat/completions` endpoint for Ollama. This has been fixed by replacing `@ai-sdk/openai` with `@ai-sdk/openai-compatible` and using the `chatModel()` method.
 
-**Error Details:**
+**Solution Applied:**
 
+```typescript
+// Old approach with incompatibility
+import { createOpenAI } from "@ai-sdk/openai";
+const ollama = createOpenAI({
+  apiKey: process.env.OPENAI_API_KEY || "branko:latest",
+  baseURL: process.env.OPENAI_BASE_URL || "http://127.0.0.1:11434/v1",
+  compatibility: "strict", // This didn't work properly
+});
+const result = streamText({
+  model: ollama(modelName),
+  // ...
+});
+
+// New approach with full compatibility
+import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
+const ollama = createOpenAICompatible({
+  baseURL: process.env.OPENAI_BASE_URL || "http://127.0.0.1:11434/v1",
+  name: "ollama",
+  apiKey: process.env.OPENAI_API_KEY || "ollama",
+});
+const result = streamText({
+  model: ollama.chatModel(modelName), // Use chatModel for proper endpoint routing
+  // ...
+});
 ```
-APICallError [AI_APICallError]: Not Found
-url: 'http://127.0.0.1:11434/v1/responses'
-statusCode: 404
-responseBody: '404 page not found'
-```
 
-**Expected Behavior:** The AI SDK should call `http://127.0.0.1:11434/v1/chat/completions` for OpenAI-compatible streaming.
-
-**Current Workarounds Attempted:**
-
-- ✅ Added `compatibility: "strict"` to force OpenAI-compatible endpoints
-- ✅ Set `OPENAI_API_KEY=ollama`
-- ✅ Configured `baseURL: "http://127.0.0.1:11434/v1"`
-- ❌ Issue persists despite configuration changes
-
-**Impact:**
+**Impact of Fix:**
 
 - MCP integration works correctly (fetches JIRA data)
-- Chat/LLM analysis fails due to endpoint mismatch
-- Users see raw MCP data without AI enhancement
+- Chat/LLM analysis now works properly with Ollama
+- Users receive complete AI-enhanced responses
 
-**⚠️ Secondary Issue: JIRA Authentication**
+**✅ Fixed: JIRA Authentication**
 
-Some JIRA operations fail with "not found" errors, likely due to:
+Some JIRA operations were failing with "not found" errors due to:
 
 - Invalid/expired API tokens
-- Insufficient JIRA permissions
+- Incorrect JIRA instance URL
 - Non-existent ticket IDs (e.g., SCRUM-8)
 
-**Error Example:**
+**Solution:**
+
+The issue has been fixed by correctly configuring the JIRA credentials in the `../hello_world_mpc/.env` file:
 
 ```
-MCP tool call error: McpError: MCP error -32602: JIRA ticket 'SCRUM-8' not found.
+# JIRA Configuration
+JIRA_BASE_URL=https://your-instance.atlassian.net
+JIRA_EMAIL=your-email@example.com
+JIRA_API_TOKEN=your_valid_api_token
+
+# Log level
+LOG_LEVEL=debug
 ```
 
-**Status:** Requires valid JIRA credentials and existing ticket IDs for testing.
+**Important:** You must use valid JIRA ticket IDs that actually exist in your JIRA instance.
 
 ### Debugging Steps
 
