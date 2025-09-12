@@ -102,6 +102,21 @@ export function ChatArea({ conversation, siblingConversations, onSend, onBranchF
   );
 }
 
+function FolderWithSubs({ count }: { count: number }) {
+  const minis = Math.min(3, count);
+  return (
+    <span className="relative inline-flex items-center">
+      <Folder className="h-4 w-4 text-primary" />
+      {Array.from({ length: minis }).map((_, i) => (
+        <Folder key={i} className="h-3 w-3 text-accent absolute" style={{ left: 10 + i * 6, bottom: -2 - i * 2, opacity: 0.9 }} />
+      ))}
+      {count > 3 && (
+        <span className="ml-[28px] text-[10px] leading-none rounded-sm bg-secondary px-1 py-0.5 text-secondary-foreground">+{count - 3}</span>
+      )}
+    </span>
+  );
+}
+
 function MessageBubble({ message, onBranch, allowBranch }: { message: Message; onBranch: () => void; allowBranch: boolean }) {
   const isUser = message.role === "user";
   return (
