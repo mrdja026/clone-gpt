@@ -19,6 +19,24 @@ export class MCPClient {
   private serverProcess: any = null;
   private isInitialized = false;
 
+  private getAuthHeaders(): Record<string, string> {
+    try {
+      // Prefer runtime-provided JWT first (e.g. from a login flow)
+      const stored =
+        typeof window !== "undefined"
+          ? window.localStorage.getItem("mcp_jwt")
+          : null;
+      // Allow static token via Vite env for local dev
+      const envToken = (import.meta as any)?.env?.VITE_MCP_JWT as
+        | string
+        | undefined;
+      const token = stored || envToken;
+      return token ? { Authorization: `Bearer ${token}` } : {};
+    } catch {
+      return {};
+    }
+  }
+
   /**
    * Initialize connection to the MCP server
    */
@@ -52,6 +70,7 @@ export class MCPClient {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          ...this.getAuthHeaders(),
         },
         body: JSON.stringify({
           name: toolName,
@@ -60,7 +79,12 @@ export class MCPClient {
       });
 
       if (!response.ok) {
-        throw new Error(`MCP tool call failed: ${response.statusText}`);
+        const text = await response.text().catch(() => "");
+        throw new Error(
+          `MCP tool call failed: ${response.status} ${response.statusText}${
+            text ? ` - ${text}` : ""
+          }`,
+        );
       }
 
       return await response.json();
@@ -83,12 +107,18 @@ export class MCPClient {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          ...this.getAuthHeaders(),
         },
         body: JSON.stringify({ uri }),
       });
 
       if (!response.ok) {
-        throw new Error(`MCP resource read failed: ${response.statusText}`);
+        const text = await response.text().catch(() => "");
+        throw new Error(
+          `MCP resource read failed: ${response.status} ${response.statusText}${
+            text ? ` - ${text}` : ""
+          }`,
+        );
       }
 
       return await response.json();
@@ -125,9 +155,18 @@ export class MCPClient {
     }
 
     try {
-      const response = await fetch("/api/mcp/tools");
+      const response = await fetch("/api/mcp/tools", {
+        headers: {
+          ...this.getAuthHeaders(),
+        },
+      });
       if (!response.ok) {
-        throw new Error(`MCP list tools failed: ${response.statusText}`);
+        const text = await response.text().catch(() => "");
+        throw new Error(
+          `MCP list tools failed: ${response.status} ${response.statusText}${
+            text ? ` - ${text}` : ""
+          }`,
+        );
       }
 
       const data = await response.json();

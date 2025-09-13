@@ -22,13 +22,16 @@ dotenv.config();
 const useTestMcp = process.env.USE_TEST_MCP === "true";
 
 // Paths with proper error checking
-const MCP_SERVER_DIR = path.resolve(__dirname, "../hello_world_mpc/src");
+// Allow override via env (external MCP server), else use local folder
+const MCP_SERVER_DIR = path.resolve(__dirname, "../hello_world_mcp/src");
 // Use test-tools.js if USE_TEST_MCP is set to 'true'
-const MCP_SERVER_PATH = useTestMcp
-  ? path.resolve(__dirname, "../hello_world_mpc/test-tools.js")
-  : path.resolve(MCP_SERVER_DIR, "server.js");
-const MCP_ENV_PATH = path.resolve(__dirname, "../hello_world_mpc/.env");
-const MCP_LOGS_DIR = path.resolve(__dirname, "../hello_world_mpc/logs");
+const MCP_SERVER_PATH = process.env.MCP_SERVER_PATH
+  ? process.env.MCP_SERVER_PATH
+  : useTestMcp
+    ? path.resolve(__dirname, "../hello_world_mcp/test-tools.js")
+    : path.resolve(MCP_SERVER_DIR, "server.js");
+const MCP_ENV_PATH = path.resolve(__dirname, "../hello_world_mcp/.env");
+const MCP_LOGS_DIR = path.resolve(__dirname, "../hello_world_mcp/logs");
 
 // Create logs directory if it doesn't exist
 if (!fs.existsSync(MCP_LOGS_DIR)) {
