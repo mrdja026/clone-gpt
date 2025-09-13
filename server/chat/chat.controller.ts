@@ -17,6 +17,8 @@ import type {
   PersistentChatResponseDto,
   ChatHistoryRequestDto,
 } from "./dto/persistent-chat.dto";
+import { streamText } from "ai";
+import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 
 @Controller("chat")
 export class ChatController {
@@ -35,14 +37,43 @@ export class ChatController {
         );
       }
 
-      // Set up streaming headers
+      // Local provider for streaming (avoids DI edge cases)
+      const ollama = createOpenAICompatible({
+        baseURL: process.env.OPENAI_BASE_URL || "http://127.0.0.1:11434/v1",
+        name: "ollama",
+        apiKey: process.env.OPENAI_API_KEY || "ollama",
+      });
+      const modelName = process.env.MODEL_NAME || "llama3.1:latest";
+
+      const result = streamText({
+        model: ollama.chatModel(modelName),
+        system:
+          chatRequest.systemPrompt ||
+          "You are a helpful assistant that provides detailed analysis and suggestions for project management queries.",
+        messages: chatRequest.messages.map((msg) => ({
+          role: msg.role,
+          content: msg.content,
+        })),
+        maxOutputTokens: 1024,
+      });
+
+      // Prefer DataStream SSE for richer events; fallback to plain text chunks
+      const pipe = (result as any).pipeDataStreamToResponse;
+      if (typeof pipe === "function") {
+        await pipe(res, {
+          headers: {
+            "Cache-Control": "no-cache",
+            Connection: "keep-alive",
+            "X-Accel-Buffering": "no",
+          },
+        });
+        return;
+      }
+
+      // Fallback: plain text streaming
       res.setHeader("Content-Type", "text/plain; charset=utf-8");
       res.setHeader("Cache-Control", "no-cache");
       res.setHeader("Connection", "keep-alive");
-
-      const result = await this.chatService.streamResponse(chatRequest);
-
-      // Stream the response
       for await (const textPart of result.textStream) {
         res.write(textPart);
       }
@@ -72,8 +103,39 @@ export class ChatController {
           HttpStatus.BAD_REQUEST,
         );
       }
+      // Use AI SDK directly (mirrors ChatService.getResponse but avoids DI issues)
+      const ollama = createOpenAICompatible({
+        baseURL: process.env.OPENAI_BASE_URL || "http://127.0.0.1:11434/v1",
+        name: "ollama",
+        apiKey: process.env.OPENAI_API_KEY || "ollama",
+      });
+      const modelName = process.env.MODEL_NAME || "llama3.1:latest";
 
-      return await this.chatService.getResponse(chatRequest);
+      const result = await streamText({
+        model: ollama.chatModel(modelName),
+        system:
+          chatRequest.systemPrompt ||
+          "You are a helpful assistant that provides detailed analysis and suggestions for project management queries.",
+        messages: chatRequest.messages.map((msg) => ({
+          role: msg.role,
+          content: msg.content,
+        })),
+        maxOutputTokens: 1024,
+      });
+
+      const fullText = await result.text;
+      const usage = await result.usage;
+
+      return {
+        message: fullText,
+        usage: usage
+          ? {
+              promptTokens: (usage as any).inputTokens || 0,
+              completionTokens: (usage as any).outputTokens || 0,
+              totalTokens: (usage as any).totalTokens || 0,
+            }
+          : undefined,
+      };
     } catch (error) {
       console.error("Chat API error:", error);
       throw new HttpException(

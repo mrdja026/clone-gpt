@@ -345,6 +345,90 @@ When a deterministic query is detected, the response will include both the struc
 
 ### Fixed Issues (September 2025)
 
+**✅ Fixed: Chat Streaming Endpoint Crash (streamResponse undefined)**
+
+Symptoms:
+
+- Server logs showed: `TypeError: Cannot read properties of undefined (reading 'streamResponse')` when calling `POST /api/chat/stream`.
+- Root cause: legacy controller relied on a DI-provided service method shape that changed and returned an unexpected value.
+
+Solution Applied:
+
+- Migrated `POST /api/chat/stream` to use the AI SDK DataStream directly in `server/chat/chat.controller.ts`.
+- Prefer SSE DataStream via `pipeDataStreamToResponse`; fallback to plain text chunks if not available.
+- This aligns with Context7 and Vercel AI SDK v5 streaming behavior.
+
+Impact:
+
+- Robust streaming on both OpenAI and Ollama-compatible backends.
+- Enables future tool/event streaming compatibility.
+
+Test:
+
+```powershell
+$b = @'
+{"messages":[{"role":"user","content":"Say hello"}]}
+'@
+Set-Content -Path body.json -Value $b -Encoding UTF8
+curl.exe -N -H "Content-Type: application/json" --data-binary "@body.json" http://localhost:3001/api/chat/stream
+```
+
+**✅ Fixed: Non‑Streaming Chat Endpoint Crash (getResponse undefined)**
+
+Symptoms:
+
+- Server logs showed: `TypeError: Cannot read properties of undefined (reading 'getResponse')` on `POST /api/chat`.
+- Root cause: DI timing/shape mismatch when invoking the service from the controller.
+
+Solution Applied:
+
+- Updated `POST /api/chat` to call the AI SDK directly (same parameters as streaming), then return the accumulated text and usage metrics.
+
+Test:
+
+```powershell
+$b = @'
+{"messages":[{"role":"user","content":"Say hello"}]}
+'@
+Invoke-WebRequest -Uri http://localhost:3001/api/chat -Method Post -ContentType 'application/json' -Body $b | Select-Object -ExpandProperty Content
+```
+
+**✅ Fixed: Client Streaming Parser Compatibility**
+
+Symptoms:
+
+- Client expected raw chunked text only; newer AI SDK streams use DataStream SSE with `text-delta` events.
+
+Solution Applied:
+
+- `client/lib/api.ts` now detects `text/event-stream` and parses AI SDK DataStream events; otherwise falls back to raw chunked text.
+
+Impact:
+
+- Works across SDK versions and providers, preparing for Context7 tool events.
+
+**✅ Fixed: Type Safety for `DBMessage.role`**
+
+Symptoms:
+
+- Type errors on `use-chats.ts` due to `role` being a generic string from the DB.
+
+Solution Applied:
+
+- Coerce/guard DB `role` into the strict union (`"user" | "assistant"`) when setting state.
+
+—
+
+Why we found these:
+
+-Observed during end‑to‑end streaming tests and PowerShell curl/iwr runs in Windows. The specific DI errors surfaced in server logs when exercising both streaming and non‑streaming endpoints. We also hit Windows quoting issues while testing; the here‑string and file‑based JSON examples above avoid escaping pitfalls.
+
+Recommended versions:
+
+- Keep `ai` on latest 5.x and `@ai-sdk/*` on latest 1.x minor updates to preserve DataStream behavior. We continue to use `@ai-sdk/openai-compatible` + `chatModel()` for Ollama compatibility.
+
+Note: The commands above are included to make it easy to validate fixes locally [[memory:8815693]].
+
 **✅ Fixed: OAuth 2.0 Client Credentials Implementation**
 
 Added full OAuth 2.0 client credentials support for JIRA Cloud integration to replace deprecated Basic Auth. The MCP server now supports both authentication methods with automatic fallback.

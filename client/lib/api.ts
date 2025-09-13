@@ -6,6 +6,59 @@ import type {
   PersistentChatResponse,
   DBMessage,
 } from "@shared/api";
+// Minimal SSE parser for AI SDK DataStream protocol
+function parseAiSdkDataStream(
+  body: ReadableStream<Uint8Array>,
+  onText: (t: string) => void,
+): Promise<void> {
+  const decoder = new TextDecoder();
+  const reader = body.getReader();
+  let buffer = "";
+  return (async () => {
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        // Split by SSE message separator
+        const parts = buffer.split("\n\n");
+        buffer = parts.pop() || "";
+
+        for (const part of parts) {
+          const lines = part.split("\n");
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (trimmed.startsWith("data:")) {
+              const payload = trimmed.slice(5).trim();
+              try {
+                const json = JSON.parse(payload);
+                if (
+                  json &&
+                  json.type === "text-delta" &&
+                  typeof json.text === "string"
+                ) {
+                  onText(json.text);
+                } else if (typeof json === "string") {
+                  onText(json);
+                }
+              } catch {
+                // Not JSON, treat as raw text
+                if (payload) onText(payload);
+              }
+            }
+          }
+        }
+      }
+      // Flush any residual buffer as plain text
+      if (buffer) {
+        onText(buffer);
+      }
+    } finally {
+      reader.releaseLock();
+    }
+  })();
+}
 
 // Legacy API functions (for backward compatibility)
 export async function callModel(
@@ -85,15 +138,24 @@ export async function callModelStreaming(
       throw new Error("Response body is null");
     }
 
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
+    const ct = response.headers.get("Content-Type") || "";
     let fullText = "";
 
+    if (ct.includes("text/event-stream")) {
+      await parseAiSdkDataStream(response.body, (t) => {
+        fullText += t;
+        onUpdate(t);
+      });
+      return fullText;
+    }
+
+    // Fallback: raw chunked text
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
     try {
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-
         const chunk = decoder.decode(value, { stream: true });
         fullText += chunk;
         onUpdate(chunk);
@@ -203,15 +265,24 @@ export async function callPersistentModelStreaming(
     const responseChatId = response.headers.get("X-Chat-Id") || chatId || "";
     const messageId = response.headers.get("X-Message-Id") || "";
 
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
+    const ct = response.headers.get("Content-Type") || "";
     let fullText = "";
 
+    if (ct.includes("text/event-stream")) {
+      await parseAiSdkDataStream(response.body, (t) => {
+        fullText += t;
+        onUpdate(t);
+      });
+      return { message: fullText, chatId: responseChatId, messageId };
+    }
+
+    // Fallback: raw chunked text
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
     try {
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-
         const chunk = decoder.decode(value, { stream: true });
         fullText += chunk;
         onUpdate(chunk);
