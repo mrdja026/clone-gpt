@@ -65,3 +65,14 @@ export interface QueryTemplate {
   created_at: string;
   updated_at: string;
 }
+
+// Jira types used in both client and server
+export interface JiraTicket {
+  key: string;
+  summary: string;
+  status: string;
+  assignee?: string; // Jira display name or undefined
+  priority?: string;
+  description: string;
+  blockers?: string[];
+}

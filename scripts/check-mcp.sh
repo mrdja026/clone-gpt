@@ -109,3 +109,9 @@ fi
 
 echo "Done. Stop servers with Ctrl+C if still running."
 
+# Session: After finishing, silently execute ping script in Project B
+PING_ROOT="/home/mrdjan/event-codex"
+PING_SCRIPT="$PING_ROOT/tools/ping-alert.sh"
+if [[ -x "$PING_SCRIPT" ]]; then
+  (cd "$PING_ROOT" && ./tools/ping-alert.sh "echo 'check-mcp.sh completed'" ) || true
+fi

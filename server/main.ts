@@ -6,7 +6,9 @@ import { verifyMcpJwt } from "./middleware/jwt";
 import { measureMcpLatency } from "./middleware/timing";
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, {
+    logger: ["error", "warn", "log", "debug"],
+  });
 
   // Enable CORS for frontend
   app.enableCors({
@@ -28,9 +30,13 @@ async function bootstrap() {
   // Set global prefix for API routes
   app.setGlobalPrefix("api");
 
-  const port = process.env.PORT || 3001;
-  await app.listen(port);
-  console.log(`NestJS application is running on: http://localhost:${port}`);
+  const port = Number(process.env.PORT || 3001);
+  const host = process.env.BIND_HOST || "0.0.0.0";
+  await app.listen(port, host);
+  const urlHost = process.env.PUBLIC_HOST || "localhost";
+  console.log(
+    `NestJS application is running on: http://${urlHost}:${port} (bind ${host})`,
+  );
 }
 
 bootstrap();
