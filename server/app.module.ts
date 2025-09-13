@@ -6,6 +6,7 @@ import { ServicesModule } from "./services/services.module";
 import { DemoController } from "./controllers/demo.controller";
 import { ChatsController } from "./controllers/chats.controller";
 import { QueryTemplatesController } from "./controllers/query-templates.controller";
+import { McpModule } from "./mcp/mcp.module";
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { QueryTemplatesController } from "./controllers/query-templates.controll
     SupabaseModule,
     ServicesModule,
     ChatModule,
+    McpModule,
   ],
   controllers: [DemoController, ChatsController, QueryTemplatesController],
   providers: [],

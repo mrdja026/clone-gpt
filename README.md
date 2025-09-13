@@ -322,6 +322,56 @@ When a deterministic query is detected, the response will include both the struc
 
 ### Fixed Issues (September 2025)
 
+**✅ Fixed: OAuth 2.0 Client Credentials Implementation**
+
+Added full OAuth 2.0 client credentials support for JIRA Cloud integration to replace deprecated Basic Auth. The MCP server now supports both authentication methods with automatic fallback.
+
+**Solution Applied:**
+
+```javascript
+// OAuth 2.0 client credentials implementation in hello_world_mpc/src/server.js
+const JIRA_CONFIG = {
+  // Basic Auth (fallback)
+  baseUrl: process.env.JIRA_BASE_URL || "https://mrdjanstajic.atlassian.net",
+  email: process.env.JIRA_EMAIL || "mrdjanstajic@gmail.com", 
+  apiToken: process.env.JIRA_API_TOKEN || "",
+  // OAuth 2.0 (preferred)
+  oauthClientId: process.env.JIRA_OAUTH_CLIENT_ID || "",
+  oauthClientSecret: process.env.JIRA_OAUTH_CLIENT_SECRET || "",
+  oauthAudience: process.env.JIRA_OAUTH_AUDIENCE || "api.atlassian.com",
+  oauthEnabled: !!process.env.JIRA_OAUTH_CLIENT_ID && !!process.env.JIRA_OAUTH_CLIENT_SECRET,
+};
+
+async getJiraClient() {
+  if (JIRA_CONFIG.oauthEnabled) {
+    const token = await this.getOAuthToken();
+    return {
+      baseURL: `https://api.atlassian.com/ex/jira/${process.env.JIRA_CLOUD_ID}`,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+      },
+    };
+  }
+  // Fallback to Basic Auth...
+}
+```
+
+**Environment Configuration:**
+
+```bash
+# OAuth 2.0 (recommended)
+JIRA_OAUTH_CLIENT_ID=your_client_id_from_developer_console
+JIRA_OAUTH_CLIENT_SECRET=your_client_secret
+JIRA_OAUTH_AUDIENCE=api.atlassian.com
+JIRA_CLOUD_ID=your_cloud_id_uuid
+
+# Basic Auth (fallback)
+JIRA_BASE_URL=https://your-instance.atlassian.net
+JIRA_EMAIL=your-email@example.com
+JIRA_API_TOKEN=your_classic_api_token
+```
+
 **✅ Fixed: AI SDK Endpoint Mismatch**
 
 The AI SDK was incorrectly calling `/v1/responses` instead of the correct `/v1/chat/completions` endpoint for Ollama. This has been fixed by replacing `@ai-sdk/openai` with `@ai-sdk/openai-compatible` and using the `chatModel()` method.
@@ -383,6 +433,55 @@ LOG_LEVEL=debug
 ```
 
 **Important:** You must use valid JIRA ticket IDs that actually exist in your JIRA instance.
+
+### Current Issues (September 2025)
+
+**🔧 In Progress: OAuth Scopes Configuration**
+
+OAuth 2.0 authentication is working but returns 403 Forbidden errors due to insufficient scopes in the Atlassian OAuth app configuration.
+
+**Current Status:**
+- ✅ OAuth token generation successful
+- ✅ CloudId discovery implemented  
+- ✅ Bearer authentication working
+- ❌ Missing required JIRA scopes causing 403 errors
+
+**Required Actions:**
+1. Configure OAuth app in Atlassian Developer Console (https://developer.atlassian.com/console/myapps/)
+2. Add required scopes:
+   - `read:jira-work` (for reading issues)
+   - `read:jira-user` (for user data)
+   - `manage:jira-project` (for project operations)
+3. Wait 5-10 minutes for scope propagation
+
+**❌ Missing: JIRA Issue Creation for Testing**
+
+The test ticket SCRUM-8 doesn't exist in the JIRA instance, causing "not found" errors even with proper authentication.
+
+**Solution Needed:**
+- Create actual JIRA issues for testing
+- Or implement issue creation in MCP tools
+- Or use existing ticket IDs from your JIRA instance
+
+**Testing Commands:**
+
+```bash
+# Test OAuth token generation
+curl -sS -X POST https://auth.atlassian.com/oauth/token \
+  -H "Content-Type: application/json" \
+  -d '{"grant_type":"client_credentials","client_id":"YOUR_CLIENT_ID","client_secret":"YOUR_CLIENT_SECRET","audience":"api.atlassian.com"}'
+
+# Test JIRA API with Bearer token
+curl -sS -H "Authorization: Bearer YOUR_TOKEN" \
+  "https://api.atlassian.com/ex/jira/YOUR_CLOUD_ID/rest/api/3/myself"
+
+# Test MCP tool call
+curl -sS -X POST http://localhost:8080/api/mcp/tool \
+  -H "Content-Type: application/json" \
+  -d '{"name":"fetch_jira_ticket","arguments":{"ticketKey":"SCRUM-8"}}'
+```
+
+**Logs Location:** Check `hello_world_mpc/logs/mcp_server.log` for detailed OAuth and JIRA API call logs.
 
 ### Debugging Steps
 
