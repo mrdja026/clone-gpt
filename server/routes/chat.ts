@@ -6,7 +6,7 @@ import { createOllama } from "ollama-ai-provider-v2";
 const rawBaseUrl =
   process.env.OLLAMA_BASE_URL ||
   process.env.OPENAI_BASE_URL ||
-  "http://127.0.0.1:11434";
+  "http://127.0.0.1:11434/api/v1";
 
 // Normalize: remove trailing /v1 if present, and ensure /api suffix exists
 const normalizedBaseUrl = (() => {

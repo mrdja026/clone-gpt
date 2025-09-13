@@ -74,6 +74,21 @@ async function getMcpClient(): Promise<Client> {
             "mrdjanstajic@gmail.com",
           JIRA_API_TOKEN:
             mcpEnvVars.JIRA_API_TOKEN || process.env.JIRA_API_TOKEN || "",
+          // OAuth (optional)
+          JIRA_OAUTH_CLIENT_ID:
+            mcpEnvVars.JIRA_OAUTH_CLIENT_ID ||
+            process.env.JIRA_OAUTH_CLIENT_ID ||
+            "",
+          JIRA_OAUTH_CLIENT_SECRET:
+            mcpEnvVars.JIRA_OAUTH_CLIENT_SECRET ||
+            process.env.JIRA_OAUTH_CLIENT_SECRET ||
+            "",
+          JIRA_OAUTH_AUDIENCE:
+            mcpEnvVars.JIRA_OAUTH_AUDIENCE ||
+            process.env.JIRA_OAUTH_AUDIENCE ||
+            "api.atlassian.com",
+          JIRA_CLOUD_ID:
+            mcpEnvVars.JIRA_CLOUD_ID || process.env.JIRA_CLOUD_ID || "",
         };
 
         // Log configuration without exposing sensitive data
@@ -82,12 +97,19 @@ async function getMcpClient(): Promise<Client> {
           JIRA_EMAIL: env.JIRA_EMAIL,
           JIRA_API_TOKEN_EXISTS: !!env.JIRA_API_TOKEN,
           JIRA_API_TOKEN_LENGTH: env.JIRA_API_TOKEN?.length || 0,
+          OAUTH_ENABLED: !!(
+            env.JIRA_OAUTH_CLIENT_ID && env.JIRA_OAUTH_CLIENT_SECRET
+          ),
+          JIRA_CLOUD_ID: env.JIRA_CLOUD_ID ? "set" : "",
         });
 
         // Check for empty API token
-        if (!env.JIRA_API_TOKEN) {
+        if (
+          !env.JIRA_API_TOKEN &&
+          !(env.JIRA_OAUTH_CLIENT_ID && env.JIRA_OAUTH_CLIENT_SECRET)
+        ) {
           console.warn(
-            "WARNING: JIRA_API_TOKEN is not set - MCP operations will fail",
+            "WARNING: JIRA credentials missing - set JIRA_API_TOKEN or OAuth client vars",
           );
         }
 
@@ -168,11 +190,15 @@ export const handleCallTool: RequestHandler = async (req, res) => {
     const response = await client.callTool({ name, arguments: args || {} });
     res.json(response || {});
   } catch (error) {
-    console.error("MCP tool call error:", error);
-    res.status(500).json({
-      error: "Failed to call MCP tool",
-      message: error instanceof Error ? error.message : "Unknown error",
-    });
+    const err: any = error;
+    console.error("MCP tool call error:", err);
+    const code = typeof err?.code === "number" ? err.code : undefined;
+    const message = err?.message || "Unknown error";
+    const data = err?.data;
+    const status = code === -32602 || code === -32601 ? 400 : 500; // Invalid params / Method not found
+    res
+      .status(status)
+      .json({ error: "MCP tool call failed", code, message, data });
   }
 };
 
@@ -191,10 +217,14 @@ export const handleReadResource: RequestHandler = async (req, res) => {
     const response = await client.readResource({ uri });
     res.json(response || {});
   } catch (error) {
-    console.error("MCP resource read error:", error);
-    res.status(500).json({
-      error: "Failed to read MCP resource",
-      message: error instanceof Error ? error.message : "Unknown error",
-    });
+    const err: any = error;
+    console.error("MCP resource read error:", err);
+    const code = typeof err?.code === "number" ? err.code : undefined;
+    const message = err?.message || "Unknown error";
+    const data = err?.data;
+    const status = code === -32602 || code === -32601 ? 400 : 500;
+    res
+      .status(status)
+      .json({ error: "Failed to read MCP resource", code, message, data });
   }
 };
