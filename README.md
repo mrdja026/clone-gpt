@@ -328,6 +328,25 @@ The application provides these API endpoints for MCP interaction:
 - `POST /api/mcp/tool` - Execute MCP tool call
 - `POST /api/mcp/resource` - Read MCP resource
 
+### HTTP‑only Mode (No Spawn)
+
+If spawning a local MCP process is not allowed in your environment, enable HTTP‑only mode:
+
+1. Provide an HTTP MCP endpoint (or an adapter) and set:
+
+```
+MCP_BASE_URL=http://127.0.0.1:4000
+MCP_NO_SPAWN=true
+```
+
+2. Without an external MCP, the server provides a minimal internal adapter (no spawn) that supports:
+   - Tools: `process_text`, `fetch_jira_ticket`
+   - Resources: `mcp://local-mcp-server/jira/projects`
+
+It uses your Jira env vars (`JIRA_BASE_URL`, `JIRA_EMAIL`, `JIRA_API_TOKEN`) and returns the same response shapes as MCP, so the client/UI requires no changes.
+
+3. To revert to stdio MCP in dev, unset `MCP_NO_SPAWN` and leave `MCP_BASE_URL` empty.
+
 ## How It Works
 
 ### Query Processing Flow

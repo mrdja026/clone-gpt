@@ -205,6 +205,17 @@ export default function Index() {
   };
 
   const onSend = async (text: string) => {
+    // Detect opt-in ping token and strip it from the prompt
+    const wantsPing = /\bDO\s+PING\b/i.test(text);
+    const cleanedText = text.replace(/\bDO\s+PING\b/gi, "").trim();
+    if (wantsPing) {
+      // Fire-and-forget ping; do not block the chat flow
+      fetch("/api/ping-alert", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: "Prompt completed" }),
+      }).catch(() => {});
+    }
     const userMessage: Message = {
       id: uid("m"),
       role: "user",
@@ -231,9 +242,9 @@ export default function Index() {
     );
 
     // Check if this is a deterministic query that needs MCP handling
-    const queryMatch = matchQuery(text);
+    const queryMatch = matchQuery(cleanedText);
     let mcpResults: string = "";
-    let enhancedPrompt = text;
+    let enhancedPrompt = cleanedText;
 
     if (queryMatch.isMatch && queryMatch.mcpActions.length > 0) {
       // Update bot message to show MCP processing
@@ -275,7 +286,7 @@ export default function Index() {
         if (queryMatch.enhancedPrompt) {
           enhancedPrompt = `${queryMatch.enhancedPrompt}\n\nRetrieved Data:\n${mcpResults}`;
         } else {
-          enhancedPrompt = `${text}\n\nRetrieved Data:\n${mcpResults}`;
+          enhancedPrompt = `${cleanedText}\n\nRetrieved Data:\n${mcpResults}`;
         }
 
         // Update bot message with MCP results immediately

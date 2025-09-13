@@ -1,0 +1,9 @@
+{
+  "key": "SCRUM-8",
+  "summary": "User can fetch SCRUM-8 details via MCP",
+  "status": "In Progress",
+  "assignee": "Jane Doe",
+  "priority": "High",
+  "description": "As a user, I can input SCRUM-8 and the app retrieves summary, assignee, and description, then passes summary to LLM for analysis.",
+  "blockers": []
+}
