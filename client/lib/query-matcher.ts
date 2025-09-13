@@ -92,6 +92,26 @@ export function matchQuery(userInput: string): QueryMatch {
   const input = userInput.toLowerCase().trim();
   const originalInput = userInput.trim();
 
+  // High-priority: bare JIRA key (e.g., "SCRUM-8") should directly call the ticket tool
+  const bareKey = originalInput.match(/^\s*([A-Z][A-Z0-9]+-\d+)\s*$/);
+  if (bareKey) {
+    const ticketKey = bareKey[1];
+    return {
+      isMatch: true,
+      confidence: 0.99,
+      originalQuery: userInput,
+      mcpActions: [
+        {
+          toolName: "fetch_jira_ticket",
+          args: { ticketKey },
+          description: `Fetching details for JIRA ticket ${ticketKey}`,
+          type: "tool",
+        },
+      ],
+      enhancedPrompt: `You are in strict analysis mode. Only use the 'Retrieved Data' from MCP JIRA to answer. If it is empty or an error, state that no data was retrieved for ${ticketKey} and stop. Do not hallucinate.`,
+    };
+  }
+
   // Pattern 1: Ticket-specific queries - uses "Ticket" keyword or Status-TICKET/RealStatus-TICKET pattern to extract ID
   if (
     input.includes("ticket") ||

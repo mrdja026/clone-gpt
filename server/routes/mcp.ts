@@ -6,17 +6,16 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 import dotenv from "dotenv";
 
 /**
- * MCP Proxy Routes - Communicates with the hello_world_mpc server over stdio
+ * MCP Proxy Routes - Communicates with the hello_world_mcp server over stdio
  */
 
-// Path to the MCP server
-const MCP_SERVER_PATH = path.resolve(
-  __dirname,
-  "../../../hello_world_mpc/src/server.js",
-);
+// Path to the MCP server (allow env override)
+const MCP_SERVER_PATH = process.env.MCP_SERVER_PATH
+  ? process.env.MCP_SERVER_PATH
+  : path.resolve(__dirname, "../../../hello_world_mcp/src/server.js");
 
 // Path to MCP server's .env file
-const MCP_ENV_PATH = path.resolve(__dirname, "../../../hello_world_mpc/.env");
+const MCP_ENV_PATH = path.resolve(__dirname, "../../../hello_world_mcp/.env");
 
 // Load MCP environment variables directly
 let mcpEnvVars: Record<string, string> = {};

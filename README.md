@@ -164,6 +164,38 @@ pnpm typecheck        # TypeScript validation
 pnpm test             # Run tests
 ```
 
+## Coding Standards & Agent Behavior
+
+These rules combine our internal `.cursor/rules/general.mdc` with the repo’s conventions. They guide how to implement features, structure code, and operate as an agent on this project.
+
+**Pages**
+- If unauthenticated, show login/signup.
+- If authenticated, go to the home where the user sees their chats.
+
+**Tech Stack Alignment**
+- React 18 + TypeScript + Vite + TailwindCSS + Radix UI + Lucide.
+- AI via Vercel AI SDK; for Ollama use `@ai-sdk/openai-compatible` and `chatModel()`.
+- Supabase planned for CRUD/persistence (optional; wire later as needed).
+
+**Best Practices**
+- Always create a brief plan before implementing a task and get approval to execute when collaborating. Do not auto‑execute large changes without agreement.
+- Keep it simple and make it work (KISS). Avoid speculative features (YAGNI). Follow clean code practices.
+- Reuse existing components where possible (`client/components`). If new, add under an appropriate subfolder there and make it theme‑aware.
+- After each fix/implementation, provide exact commands to test end‑to‑end.
+- Do not use emojis in logs.
+
+**Implementation Rules**
+- Prefer client‑side changes. Only add server endpoints when strictly necessary (secrets, DB, private integrations).
+- Use NestJS controllers/services for backend work; avoid adding ad‑hoc Express routes.
+- Preserve streaming behavior: server uses AI SDK DataStream; client parses SSE `text-delta` and falls back to raw chunks.
+- Keep environment secrets on the server. Do not attempt to read local `.env` via agent/tooling calls.
+
+**MCP Usage (JIRA Automation)**
+- MCP must be used for supported deterministic queries. Communication is STDIO and JSON‑RPC 2, or HTTP if configured.
+- The companion MCP server (`hello_world_mcp`) is included in this repo. Use `pnpm dev:mcp` when available.
+
+For more operational guidance, see `AGENTS.md`.
+
 ## Deployment
 
 ### Build for Production
@@ -226,7 +258,7 @@ This application integrates with the Model Context Protocol (MCP) to provide enh
 ## Features
 
 - 🔍 **Automatic Query Detection** - Recognizes JIRA-related queries and triggers MCP actions
-- 🛠️ **MCP Tool Integration** - Connects to local `hello_world_mpc` server for JIRA operations
+- 🛠️ **MCP Tool Integration** - Connects to local `hello_world_mcp` server for JIRA operations
 - 📊 **Structured Data Display** - Formats JIRA ticket data with status, assignee, and blockers
 - 🤖 **AI Enhancement** - Combines MCP data with LLM analysis for comprehensive responses
 
@@ -273,13 +305,13 @@ This script:
 
 ### Manual MCP Server Setup
 
-The integration requires the `hello_world_mpc` server, which should be located at:
+The integration uses the `hello_world_mcp` server, located at:
 
 ```
-../hello_world_mpc/src/server.js
+../hello_world_mcp/src/server.js
 ```
 
-Configure environment variables for the MCP server by creating a `.env` file in the `hello_world_mpc` directory:
+Configure environment variables for the MCP server by creating a `.env` file in the `hello_world_mcp` directory:
 
 ```
 # JIRA Configuration
@@ -436,7 +468,7 @@ Added full OAuth 2.0 client credentials support for JIRA Cloud integration to re
 **Solution Applied:**
 
 ```javascript
-// OAuth 2.0 client credentials implementation in hello_world_mpc/src/server.js
+// OAuth 2.0 client credentials implementation in hello_world_mcp/src/server.js
 const JIRA_CONFIG = {
   // Basic Auth (fallback)
   baseUrl: process.env.JIRA_BASE_URL || "https://mrdjanstajic.atlassian.net",
@@ -527,7 +559,7 @@ Some JIRA operations were failing with "not found" errors due to:
 
 **Solution:**
 
-The issue has been fixed by correctly configuring the JIRA credentials in the `../hello_world_mpc/.env` file:
+The issue has been fixed by correctly configuring the JIRA credentials in the `../hello_world_mcp/.env` file:
 
 ```
 # JIRA Configuration
@@ -591,7 +623,7 @@ curl -sS -X POST http://localhost:8080/api/mcp/tool \
   -d '{"name":"fetch_jira_ticket","arguments":{"ticketKey":"SCRUM-8"}}'
 ```
 
-**Logs Location:** Check `hello_world_mpc/logs/mcp_server.log` for detailed OAuth and JIRA API call logs.
+**Logs Location:** Check `hello_world_mcp/logs/mcp_server.log` for detailed OAuth and JIRA API call logs.
 
 ### Debugging Steps
 

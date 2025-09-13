@@ -5,6 +5,7 @@ import { fileURLToPath } from "url";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { ConfigService } from "@nestjs/config";
+import fs from "fs";
 
 @Injectable()
 export class McpService {
@@ -31,12 +32,33 @@ export class McpService {
   private async ensureStdIoClient(): Promise<Client> {
     if (this.client) return this.client;
     const nodeExecutable = process.platform === "win32" ? "node.exe" : "node";
-    const mcpServerPath = path.resolve(
-      this.getCurrentDirname(),
-      "../../../hello_world_mpc/src/server.js",
-    );
+    // Allow overriding MCP server path via env (e.g., external workspace)
+    const envServerPath = process.env.MCP_SERVER_PATH;
+    const mcpServerPath = envServerPath
+      ? envServerPath
+      : path.resolve(
+          this.getCurrentDirname(),
+          "../../../hello_world_mcp/src/server.js",
+        );
+    const resolvedCwd = path.dirname(mcpServerPath);
+    const serverExists = fs.existsSync(mcpServerPath);
+    const cwdExists = fs.existsSync(resolvedCwd);
+    const stat = serverExists ? fs.statSync(mcpServerPath) : null;
+    console.log("[MCP] ensureStdIoClient", {
+      nodeExecutable,
+      mcpServerPath,
+      serverExists,
+      serverSize: stat?.size ?? null,
+      resolvedCwd,
+      cwdExists,
+      usingExternalPath: !!envServerPath,
+    });
     const env = {
       ...process.env,
+      // Basic auth credentials for Jira (preferred for free-tier)
+      JIRA_BASE_URL: this.configService.get("JIRA_BASE_URL") || process.env.JIRA_BASE_URL,
+      JIRA_EMAIL: this.configService.get("JIRA_EMAIL") || process.env.JIRA_EMAIL,
+      JIRA_API_TOKEN: this.configService.get("JIRA_API_TOKEN") || process.env.JIRA_API_TOKEN,
       JIRA_OAUTH_CLIENT_ID: this.configService.get("JIRA_OAUTH_CLIENT_ID"),
       JIRA_OAUTH_CLIENT_SECRET: this.configService.get(
         "JIRA_OAUTH_CLIENT_SECRET",
@@ -48,20 +70,40 @@ export class McpService {
       JIRA_CLOUD_ID: this.configService.get("JIRA_CLOUD_ID"),
     } as Record<string, string | undefined>;
 
-    const transport = new StdioClientTransport({
-      command: nodeExecutable,
-      args: [mcpServerPath],
-      env,
-      cwd: path.dirname(mcpServerPath),
-    });
+    try {
+      if (!serverExists) {
+        console.error("[MCP] Server path does not exist", { mcpServerPath });
+      }
+      if (!cwdExists) {
+        console.error("[MCP] Working directory does not exist", { resolvedCwd });
+      }
 
-    const client = new Client(
-      { name: "clone-gpt-mcp-proxy", version: "1.0.0" },
-      { capabilities: { tools: {}, resources: {} } },
-    );
-    await client.connect(transport);
-    this.client = client;
-    return client;
+      const transport = new StdioClientTransport({
+        command: nodeExecutable,
+        args: [mcpServerPath],
+        env,
+        cwd: resolvedCwd,
+      });
+
+      const client = new Client(
+        { name: "clone-gpt-mcp-proxy", version: "1.0.0" },
+        { capabilities: { tools: {}, resources: {} } },
+      );
+      await client.connect(transport);
+      this.client = client;
+      console.log("[MCP] Connected via stdio", { mcpServerPath });
+      return client;
+    } catch (e: any) {
+      console.error("[MCP] Failed to connect via stdio", {
+        mcpServerPath,
+        resolvedCwd,
+        serverExists,
+        cwdExists,
+        message: e?.message,
+        stack: e?.stack?.split("\n").slice(0, 3).join(" ") ?? null,
+      });
+      throw e;
+    }
   }
 
   private async callRpc<T = any>(method: string, params?: any): Promise<T> {
@@ -76,13 +118,28 @@ export class McpService {
       return res.data as T;
     } catch (err: any) {
       // Fallback to STDIO (for dev, or when HTTP MCP is not running)
+      console.warn("[MCP] HTTP call failed; falling back to stdio", {
+        method,
+        baseUrl: this.getMcpBaseUrl(),
+        httpError: err?.message,
+      });
       const client = await this.ensureStdIoClient();
-      if (method === "listTools") return client.listTools() as unknown as T;
-      if (method === "listResources")
-        return client.listResources() as unknown as T;
-      if (method === "callTool") return client.callTool(params) as unknown as T;
-      if (method === "readResource")
-        return client.readResource(params) as unknown as T;
+      try {
+        if (method === "listTools") return client.listTools() as unknown as T;
+        if (method === "listResources")
+          return client.listResources() as unknown as T;
+        if (method === "callTool")
+          return client.callTool(params) as unknown as T;
+        if (method === "readResource")
+          return client.readResource(params) as unknown as T;
+      } catch (stdioErr: any) {
+        console.error("[MCP] stdio call failed", {
+          method,
+          message: stdioErr?.message,
+          stack: stdioErr?.stack?.split("\n").slice(0, 3).join(" ") ?? null,
+        });
+        throw stdioErr;
+      }
       throw err;
     }
   }

@@ -19,9 +19,9 @@ const __dirname = path.dirname(__filename);
 dotenv.config();
 
 // Paths with proper error checking
-const MCP_SERVER_DIR = path.resolve(__dirname, "../hello_world_mpc/src");
-const MCP_SERVER_PATH = path.resolve(MCP_SERVER_DIR, "server.js");
-const MCP_ENV_PATH = path.resolve(__dirname, "../hello_world_mpc/.env");
+const MCP_SERVER_DIR = path.resolve(__dirname, "../hello_world_mcp/src");
+const MCP_SERVER_PATH = process.env.MCP_SERVER_PATH || path.resolve(MCP_SERVER_DIR, "server.js");
+const MCP_ENV_PATH = path.resolve(__dirname, "../hello_world_mcp/.env");
 
 // Log paths for debugging
 console.log("MCP Server Path:", MCP_SERVER_PATH);
