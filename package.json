@@ -11,7 +11,7 @@
     ]
   },
   "scripts": {
-    "dev": "concurrently -k -n VITE,NEST \"vite\" \"cross-env PORT=3001 tsx watch server/main.ts\"",
+    "dev": "concurrently -k -n NEST,VITE \"cross-env PORT=3001 tsx watch server/main.ts\" \"wait-on http://localhost:3001/api/ping && vite\"",
     "dev:server": "cross-env PORT=3001 tsx watch server/main.ts",
     "dev:tail-mcp": "node ../hello_world_mpc/scripts/tail-log.js",
     "build": "npm run build:client && npm run build:server",
@@ -26,8 +26,8 @@
     "dev:test-mcp": "concurrently -k -n APP,TAIL \"cross-env USE_TEST_MCP=true node start-with-mcp.mjs\" \"pnpm dev:tail-mcp\""
   },
   "dependencies": {
-    "@ai-sdk/openai": "^1.0.15",
-    "@ai-sdk/openai-compatible": "^1.0.15",
+    "@ai-sdk/openai": "^2.0.30",
+    "@ai-sdk/openai-compatible": "^1.0.17",
     "@modelcontextprotocol/sdk": "^1.0.0",
     "@nestjs/common": "^11.1.6",
     "@nestjs/config": "^4.0.2",
@@ -35,7 +35,7 @@
     "@nestjs/mapped-types": "^2.1.0",
     "@nestjs/platform-express": "^11.1.6",
     "@supabase/supabase-js": "^2.57.4",
-    "ai": "^5.0.41",
+    "ai": "^5.0.43",
     "axios": "^1.12.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.2",
@@ -123,6 +123,7 @@
     "typescript": "^5.9.2",
     "vaul": "^1.1.2",
     "vite": "^7.1.2",
+    "wait-on": "^7.2.0",
     "vitest": "^3.2.4"
   },
   "packageManager": "pnpm@10.14.0+sha512.ad27a79641b49c3e481a16a805baa71817a04bbe06a38d17e60e2eaee83f6a146c6a688125f5792e48dd5ba30e7da52a5cda4c3992b9ccf333f9ce223af84748"

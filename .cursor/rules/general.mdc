@@ -27,6 +27,7 @@ alwaysApply: true
 - Adhere to KISS principle
 - Adhere to YAGNI principles
 - After every fix and impementation give commands to test the full solution
+- DO NOT USE EMOJIES IN LOGS
 
 # Implementation rules
 
