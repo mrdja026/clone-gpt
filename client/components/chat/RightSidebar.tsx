@@ -2,7 +2,7 @@ import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
-import { MessageSquare, History, Plus } from "lucide-react";
+import { MessageSquare, History, Plus, Folder } from "lucide-react";
 import type { Conversation, QueryTemplate } from "./types";
 
 interface RightSidebarProps {
@@ -43,8 +43,9 @@ export function RightSidebar({
       <ScrollArea className="flex-1">
         <div className="p-4 space-y-6">
           <section>
-            <h3 className="text-xs uppercase tracking-wide text-muted-foreground mb-3">
-              Deterministic queries
+            <h3 className="text-xs uppercase tracking-wide text-muted-foreground mb-3 flex items-center gap-2">
+              <Folder className="h-3.5 w-3.5" />
+              Default folder
             </h3>
             <div className="grid grid-cols-1 gap-2">
               {queries.map((q) => (

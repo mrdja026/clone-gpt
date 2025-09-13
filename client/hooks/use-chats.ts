@@ -132,7 +132,14 @@ export function useChatMessages(chatId: string) {
         .order("created_at", { ascending: true });
 
       if (error) throw error;
-      setMessages(data || []);
+      setMessages(
+        (data || []).map((m) => ({
+          ...m,
+          role: (m.role === "user" || m.role === "assistant"
+            ? m.role
+            : "assistant") as DBMessage["role"],
+        })),
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to fetch messages");
     } finally {
@@ -158,8 +165,14 @@ export function useChatMessages(chatId: string) {
       if (error) throw error;
 
       // Add to local state
-      setMessages((prev) => [...prev, data]);
-      return data;
+      const coerced: DBMessage = {
+        ...data,
+        role: (data.role === "user" || data.role === "assistant"
+          ? data.role
+          : "assistant") as DBMessage["role"],
+      };
+      setMessages((prev) => [...prev, coerced]);
+      return coerced;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to add message");
       return null;

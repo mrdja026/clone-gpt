@@ -1,9 +1,14 @@
-import { Body, Controller, Get, Post } from "@nestjs/common";
+import { Body, Controller, Get, Post, Inject } from "@nestjs/common";
 import { McpService } from "./mcp.service";
 
-@Controller("api/mcp")
+@Controller("mcp")
 export class McpController {
-  constructor(private readonly mcpService: McpService) {}
+  constructor(@Inject(McpService) private readonly mcpService: McpService) {
+    this.listTools = this.listTools.bind(this);
+    this.listResources = this.listResources.bind(this);
+    this.callTool = this.callTool.bind(this);
+    this.readResource = this.readResource.bind(this);
+  }
 
   @Get("tools")
   async listTools() {

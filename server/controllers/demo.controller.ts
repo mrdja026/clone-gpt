@@ -1,5 +1,5 @@
 import { Controller, Get } from "@nestjs/common";
-import { DemoResponse } from "../../shared/api";
+import type { DemoResponse } from "../../shared/api";
 
 @Controller()
 export class DemoController {
