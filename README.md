@@ -721,3 +721,8 @@ SLO/observability
 ## License
 
 This project is licensed under the MIT License.
+
+#TODO
+
+- [ ] still halucinates
+- [ ] lots of duplicate files/stubbs remove them
