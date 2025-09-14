@@ -207,12 +207,12 @@ Goal: Keep `OPENAI_BASE_URL=http://127.0.0.1:11434/v1` in WSL while using Window
 Steps:
 
 - Ensure `.env` has `MODEL_NAME=branko:latest` and `OPENAI_BASE_URL=http://127.0.0.1:11434/v1`.
-- Free WSL port 11434 if taken: `ss -ltnp | grep ':11434'` → stop that process.
+- If possible, free WSL port 11434 so the proxy can bind: `ss -ltnp | grep ':11434'` → stop that process. If 11434 remains busy, the server will route to `http://<WINDOWS_OLLAMA_HOST_IP>:11434/v1` automatically.
 - On Windows, set `OLLAMA_HOST=0.0.0.0` and restart the Ollama service; allow TCP 11434 in the firewall.
 - Start app: `pnpm dev`.
   - On startup, the server checks if `branko:latest` is present locally; if missing, it autostarts a tiny proxy that binds `127.0.0.1:11434` and forwards to the Windows host IP (from `/etc/resolv.conf` or `WINDOWS_OLLAMA_HOST_IP`).
 - Verify forwarding by listing models from WSL: `curl -s http://127.0.0.1:11434/v1/models | jq -r '.data[].id'` → must include `branko:latest`.
-- If forwarding doesn’t engage, check logs for `[OllamaProxy]` and ensure 11434 is free in WSL.
+- If forwarding doesn’t engage, check logs for `[OllamaProxy]`. When 11434 is busy, calls still work via the Windows IP fallback. See `docs/task6.md` for the planned auto‑port binding (11435+).
 
 Known pitfalls:
 
@@ -327,3 +327,5 @@ Session logged at: 2025-09-14T18:17:47.307Z
 Session logged at: 2025-09-14T20:28:25.684Z
 
 Session logged at: 2025-09-14T20:28:29.971Z
+
+Session logged at: 2025-09-14T20:41:51.815Z

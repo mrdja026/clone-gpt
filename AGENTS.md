@@ -77,6 +77,7 @@ className={cn(
 - **Hot reload**: Client (Vite) and server (tsx watch) both hot-reload.
 - **API prefix**: All routes are under `/api/*`.
 - **WSL2**: Vite `host: true`, `strictPort: true`, and HMR host are set for Windows access.
+  - If `127.0.0.1:11434` is busy in WSL, the server routes LLM calls to `http://<WINDOWS_OLLAMA_HOST_IP>:11434/v1`. See `docs/task6.md` for the planned auto‑port proxy (e.g., 11435) and how to verify via `/api/healthz`.
 
 #### Example API Routes
 
