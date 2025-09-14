@@ -352,6 +352,26 @@ export function matchQuery(userInput: string): QueryMatch {
     };
   }
 
+  // Fallback: If any JIRA key appears anywhere in the input, fetch it
+  {
+    const jiraKeys = extractJiraKeys(originalInput);
+    if (jiraKeys.length > 0) {
+      return {
+        isMatch: true,
+        confidence: 0.9,
+        originalQuery: userInput,
+        mcpActions: jiraKeys.map((ticketKey) => ({
+          toolName: "fetch_jira_ticket",
+          args: { ticketKey },
+          description: `Fetching details for JIRA ticket ${ticketKey}`,
+          type: "tool",
+        })),
+        enhancedPrompt:
+          `You are in strict analysis mode. Only use the 'Retrieved Data' below that comes from the MCP JIRA tool. If no data is present, reply: "No JIRA data found for ${jiraKeys[0]}". Do not infer or hallucinate.`,
+      };
+    }
+  }
+
   // No match found
   return {
     isMatch: false,

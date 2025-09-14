@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { Button } from "@/components/ui/button";
 import { RightSidebar } from "@/components/chat/RightSidebar";
 import { ChatArea } from "@/components/chat/ChatArea";
 import type { Conversation, Message } from "@/components/chat/types";
 import { cn } from "@/lib/utils";
-import { Moon, SunMedium } from "lucide-react";
 import { Link } from "react-router-dom";
+import AppHeader from "@/components/AppHeader";
+import ProvidersMenu from "@/components/ProvidersMenu";
+import ThemeToggle from "@/components/ThemeToggle";
 import { matchQuery, formatMCPResponse } from "@/lib/query-matcher";
 import { mcpClient } from "@/lib/mcp-client";
 
@@ -479,45 +480,16 @@ export default function Index() {
 
   return (
     <div className="min-h-screen grid grid-rows-[auto,1fr]">
-      <header className="border-b bg-card">
-        <div className="container mx-auto flex items-center justify-between py-3 px-4">
-          <div className="flex items-center gap-3">
-            <div className="h-7 w-7 rounded-md bg-primary" />
-            <div>
-              <div className="font-semibold">JiraGPT</div>
-              <div className="text-xs text-muted-foreground">
-                Deterministic prompts + branching chats
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Link
-              to="/"
-              className="text-sm text-muted-foreground hover:text-foreground"
-            >
-              Home
-            </Link>
-            <Link
-              to="/about"
-              className="text-sm text-muted-foreground hover:text-foreground"
-            >
-              About
-            </Link>
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label="Toggle theme"
-              onClick={() => setTheme(!dark)}
-            >
-              {dark ? (
-                <SunMedium className="h-4 w-4" />
-              ) : (
-                <Moon className="h-4 w-4" />
-              )}
-            </Button>
-          </div>
-        </div>
-      </header>
+      <AppHeader
+        right={
+          <>
+            <Link to="/" className="text-sm text-muted-foreground hover:text-foreground">Home</Link>
+            <Link to="/about" className="text-sm text-muted-foreground hover:text-foreground">About</Link>
+            <ProvidersMenu />
+            <ThemeToggle />
+          </>
+        }
+      />
 
       <main className="py-4">
         <div

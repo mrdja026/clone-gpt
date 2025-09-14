@@ -81,23 +81,24 @@ export class McpService {
         process.env.MCP_USE_FIXTURES === "1" ||
         process.env.MCP_USE_FIXTURES === "true";
       if (useFixtures) {
-        const fixturesDir = path.resolve(
-          this.getCurrentDirname(),
-          "../../fixtures/jira",
-        );
-        const fixturePath = path.join(fixturesDir, `${ticketKey}.json`);
-        if (fs.existsSync(fixturePath)) {
-          const raw = fs.readFileSync(fixturePath, "utf-8");
-          const data = JSON.parse(raw);
-          return {
-            key: String(data.key || ticketKey),
-            summary: String(data.summary || ""),
-            status: String(data.status || ""),
-            assignee: data.assignee ? String(data.assignee) : "",
-            priority: data.priority ? String(data.priority) : "",
-            description: String(data.description || ""),
-            blockers: Array.isArray(data.blockers) ? data.blockers : [],
-          };
+        const fromHere = path.resolve(this.getCurrentDirname(), "../../fixtures/jira");
+        const fromCwd = path.resolve(process.cwd(), "server/fixtures/jira");
+        const candidateDirs = [fromHere, fromCwd];
+        for (const dir of candidateDirs) {
+          const fixturePath = path.join(dir, `${ticketKey}.json`);
+          if (fs.existsSync(fixturePath)) {
+            const raw = fs.readFileSync(fixturePath, "utf-8");
+            const data = JSON.parse(raw);
+            return {
+              key: String(data.key || ticketKey),
+              summary: String(data.summary || ""),
+              status: String(data.status || ""),
+              assignee: data.assignee ? String(data.assignee) : "",
+              priority: data.priority ? String(data.priority) : "",
+              description: String(data.description || ""),
+              blockers: Array.isArray(data.blockers) ? data.blockers : [],
+            };
+          }
         }
       }
     } catch (e) {
@@ -247,15 +248,15 @@ export class McpService {
       );
       return res.data as T;
     } catch (err: any) {
-      // If spawn is disabled, attempt internal adapter for known tools/resources
-      console.warn("[MCP] HTTP call failed; falling back to stdio", {
+      // If fixtures are enabled, use internal adapter for known tools/resources
+      console.warn("[MCP] HTTP call failed; selecting fallback", {
         method,
         baseUrl: this.getMcpBaseUrl(),
         httpError: err?.message,
       });
-      const noSpawn =
-        process.env.MCP_NO_SPAWN === "true" || process.env.MCP_NO_SPAWN === "1";
-      if (noSpawn) {
+      const useFixtures =
+        process.env.MCP_USE_FIXTURES === "true" || process.env.MCP_USE_FIXTURES === "1";
+      if (useFixtures) {
         try {
           // Internal adapter only supports minimal surface we need
           if (method === "listTools") {
