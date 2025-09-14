@@ -1,5 +1,5 @@
 #!/bin/bash
-# codex-session.sh - Run Codex CLI with a rolling session file
+# codex-session.sh - Run Codex CLI with a rolling session file (default context7)
 
 SESSION_FILE=$1
 
@@ -10,10 +10,10 @@ fi
 
 while true; do
   clear
-  echo ">>> Sending session file to Codex..."
-  echo "=================================="
+  echo ">>> Sending session file to Codex (default context7)..."
+  echo "======================================================"
   cat "$SESSION_FILE" | codex
-  echo "=================================="
+  echo "======================================================"
   echo "Session file: $SESSION_FILE"
   echo "Press [ENTER] to continue, [q] to quit."
   read -r input
@@ -22,4 +22,3 @@ while true; do
     break
   fi
 done
-

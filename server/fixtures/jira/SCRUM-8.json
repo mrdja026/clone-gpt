@@ -1,9 +1,12 @@
 {
   "key": "SCRUM-8",
-  "summary": "User can fetch SCRUM-8 details via MCP",
+  "summary": "Improve onboarding flow and add tooltip hints",
   "status": "In Progress",
   "assignee": "Jane Doe",
   "priority": "High",
-  "description": "As a user, I can input SCRUM-8 and the app retrieves summary, assignee, and description, then passes summary to LLM for analysis.",
-  "blockers": []
+  "description": "As a new user, I want clearer onboarding with contextual tooltips so I can discover features without reading docs.",
+  "blockers": [
+    "Waiting on UX copy approval",
+    "Dependency on analytics event naming convention"
+  ]
 }

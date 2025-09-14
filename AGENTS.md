@@ -57,7 +57,8 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 ### Styling System
 
 - **Primary**: TailwindCSS 3 utility classes
-- **Theme and design tokens**: Configure in `client/global.css` 
+- **Theme and design tokens**: Configure in `client/global.css`
+- **Theme and design consistency**: As the rest of @components and use TAILWIND IMPORTANT
 - **UI components**: Pre-built library in `client/components/ui/`
 - **Utility**: `cn()` function combines `clsx` + `tailwind-merge` for conditional classes
 
@@ -78,6 +79,7 @@ className={cn(
 - **WSL2**: Vite `host: true`, `strictPort: true`, and HMR host are set for Windows access.
 
 #### Example API Routes
+
 - `GET /api/ping` - Simple ping
 - `GET /api/demo` - Demo endpoint
 - `GET /api/healthz` - Diagnostics (port/host, MCP path)
@@ -87,12 +89,15 @@ className={cn(
 - `POST /api/ping-alert` - Triggers local ping (with terminal-bell fallback)
 
 ### Shared Types
+
 Import consistent types in both client and server:
+
 ```typescript
-import { DemoResponse } from '@shared/api';
+import { DemoResponse } from "@shared/api";
 ```
 
 Path aliases:
+
 - `@shared/*` - Shared folder
 - `@/*` - Client folder
 
@@ -118,7 +123,9 @@ pnpm test:e2e:noserver  # Playwright e2e (assumes dev server already running)
 Open `client/global.css` and `tailwind.config.ts` and add new tailwind colors.
 
 ### New API Route (NestJS)
+
 1. Optional: Define a shared interface in `shared/api.ts`:
+
 ```typescript
 export interface MyRouteResponse {
   message: string;
@@ -127,6 +134,7 @@ export interface MyRouteResponse {
 ```
 
 2. Create a controller in `server/controllers/my.controller.ts`:
+
 ```typescript
 import { Controller, Get } from "@nestjs/common";
 import type { MyRouteResponse } from "@shared/api";
@@ -143,16 +151,19 @@ export class MyController {
 3. Add the controller to `server/app.module.ts` controllers array.
 
 4. Use in React components with type safety:
-```typescript
-import { MyRouteResponse } from '@shared/api'; // Optional: for type safety
 
-const response = await fetch('/api/my-endpoint');
+```typescript
+import { MyRouteResponse } from "@shared/api"; // Optional: for type safety
+
+const response = await fetch("/api/my-endpoint");
 const data: MyRouteResponse = await response.json();
 ```
 
 ### New Page Route
+
 1. Create component in `client/pages/MyPage.tsx`
 2. Add route in `client/App.tsx`:
+
 ```typescript
 <Route path="/my-page" element={<MyPage />} />
 ```
@@ -172,12 +183,17 @@ const data: MyRouteResponse = await response.json();
 - Comprehensive UI component library included
 - Type-safe API communication via shared interfaces
 - MCP integration: optional external MCP via `MCP_SERVER_PATH`; fixtures via `MCP_USE_FIXTURES=1`.
-- DO PING: append `DO PING` in prompts; client strips it and calls `/api/ping-alert` (falls back to terminal bell if script missing).
+- use general.mdc for coding .cursor/rules/general.mdc
+
+## CODING
+
+Behave like my second brain. Work through the problem until you’d naturally stop after ~30 minutes.
 
 ## Debugging & Logs
 
 - Read `session.md` first
   - Treat `session.md` as the living source of truth when debugging. It documents the latest environment assumptions, E2E coverage, WSL2 notes, and commands. Start there to avoid stale steps.
+  - use general.mdc for coding .cursor/rules/general.mdc
 
 - Fast logging loop
   - `pnpm dev:logs` — runs dev and writes combined logs to `logs/dev_YYYYMMDD_HHMMSS.log` (Vite + Nest). Inspect this file when the app appears to “hang”.
@@ -191,9 +207,6 @@ const data: MyRouteResponse = await response.json();
 - MCP fixtures and types
   - Enable deterministic Jira responses with `MCP_USE_FIXTURES=1`.
   - Fixture example: `server/fixtures/jira/SCRUM-8.json`; shared type: `shared/api.ts` (`JiraTicket`).
-
-- DO PING behavior
-  - Append `DO PING` to any prompt; client removes it before processing and calls `POST /api/ping-alert` (controller: `server/controllers/ping-alert.controller.ts`). Optional external script path via `PING_ALERT_SCRIPT`.
 
 - E2E reference (Playwright)
   - Config: `playwright.config.ts`. Specs: `e2e/home-smoke.spec.ts`, `e2e/mcp-scrum8.spec.ts`.

@@ -10,10 +10,16 @@ Path: ~/event-codex/
 Description: Bare bones mcp server that uses tools and resources
 Key files: index.js, codex-session.sh
 
+# Guidelines: general mdc
+
+Description how to code
+key files cursor/rules/general.mdc
+
 # Task
 
-Behave like my second brain. Work through the problem until you’d naturally stop after ~30 minutes.
-All info about the projects are in Readme.md files and other .md files
+# Behave like my second brain. Work through the problem until you’d naturally stop after ~30 minutes.
+
+All info about the projects are in Readme.md Geberal mndc files and other .md files
 The Local MCP Server is /home/mrdjan/event-codex/hello_world_mpc
 All info about the projects are in Readme.md files and other .md files
 Ollama is serving a model called branko:latest on the http://192.168.128.1:11434 that
@@ -32,13 +38,11 @@ I HAVE PERMISIONS ON EVERYTHING I SHOULD BE ABLE TO EXECUTE ticket SCRUM-8
 
 # How to loop
 
-READ ALL THE REOPOS
-Suggest edits, commands, or code. Use @Readme.md files and general.mdc for info about the project and tech stack.You are a fullstack eng who knows everything, how to debug, log, read logs. If it is broken not working devise a plan and iterate. You can run every command in this directory or /home/mrdjan/event-codex/hello_world_mpc
-Afer every completion silently exedcute event-codex/tools
+## Behave like my second brain. Work through the problem until you’d naturally stop after ~30 minutes.
 
-AFTER FINISHING SILENTLY EXECUTE PING sh script in Project B path /tools/ping-alert.sh
-
-15:44
+READ ALL THE Projects A and B
+Suggest edits, commands, or code. Use @Readme.md files and general.mdc Guidelines for info about the project and tech stack.You are a fullstack eng who knows everything, how to debug, log, read logs. If it is broken not working devise a plan and iterate. You can run every command in this directory or Repo B
+Afer every completion silently exedcute event-codex/tools. Allways first create plans and then execute them
 
 ## Current Status & TODO (Testing MCP end-to-end)
 
@@ -180,7 +184,7 @@ Links
 
 - How to run (tests)
   - Install once: `pnpm add -D @playwright/test && pnpm exec playwright install chromium`
-  - Auto-start server: `pnpm test:e2e`
+  - Auto-start server: `pnpm test:e2e` (starts dev with `MCP_USE_FIXTURES=1`)
   - Manual server mode:
     - Terminal A: `pnpm dev:fixtures`
     - Terminal B: `pnpm test:e2e:noserver`
@@ -220,6 +224,12 @@ Links
   - Nest on 3001 by default (`PORT=3001`), Vite on 8080; proxy points to `API_PORT` (default 3001).
   - MCP fixtures enabled in dev via `MCP_USE_FIXTURES=1`.
   - Optional ping script path via `PING_ALERT_SCRIPT`.
+
+### Fixtures and MCP spawn
+
+- Fixture location: `server/fixtures/jira/<TICKET>.json` (e.g., `SCRUM-8.json`).
+- With `MCP_USE_FIXTURES=1`, the server uses an internal adapter (no spawn) and reads fixtures directly.
+- We removed the `MCP_NO_SPAWN` flag from the codebase; fixture mode no longer requires it. To use a real MCP via stdio, unset `MCP_USE_FIXTURES` and configure `MCP_SERVER_PATH`.
 
 ### Git Hook
 
@@ -342,7 +352,7 @@ Session logged at: 2025-09-13T19:13:05.112Z
 - Notes
   - This endpoint is intentionally lightweight and open in dev; if you lock down routes later, keep this one permitted or gate it with a local-only check as needed.
 
-## Auto-open Browser + DO PING on Ready
+## Auto-open Browser
 
 - Command
   - `pnpm dev:fixtures:open`
@@ -357,3 +367,5 @@ Session logged at: 2025-09-13T19:13:05.112Z
   - `package.json` — `dev:fixtures:open` runs app + opener concurrently.
 
 Session logged at: 2025-09-13T22:48:45.867Z
+
+Session logged at: 2025-09-14T06:44:16.447Z

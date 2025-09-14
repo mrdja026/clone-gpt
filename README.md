@@ -10,6 +10,7 @@ A production-ready ChatGPT-like application built with React, NestJS, and AI SDK
 - 💾 **Persistent Chat History** - Save and resume conversations with Supabase integration
 - 📱 **Responsive Design** - Modern UI with TailwindCSS and Radix components
 - 🔧 **Flexible AI Provider** - Switch between OpenAI API and local Ollama seamlessly
+- ✅ **E2E Test Suite** - Playwright tests included and passing on fixtures
 
 ## Tech Stack
 
@@ -58,6 +59,12 @@ pnpm dev
 ```
 
 The application will be available at `http://localhost:8080`
+
+## Testing
+
+- Run e2e (auto-starts dev with fixtures): `pnpm test:e2e`
+- Or run against an already started dev server: `pnpm dev:fixtures` then `pnpm test:e2e:noserver`
+- Specs live in `e2e/`, config in `playwright.config.ts`. Current suite is passing using fixtures.
 
 ## Using with Ollama
 
@@ -169,15 +176,18 @@ pnpm test             # Run tests
 These rules combine our internal `.cursor/rules/general.mdc` with the repo’s conventions. They guide how to implement features, structure code, and operate as an agent on this project.
 
 **Pages**
+
 - If unauthenticated, show login/signup.
 - If authenticated, go to the home where the user sees their chats.
 
 **Tech Stack Alignment**
+
 - React 18 + TypeScript + Vite + TailwindCSS + Radix UI + Lucide.
 - AI via Vercel AI SDK; for Ollama use `@ai-sdk/openai-compatible` and `chatModel()`.
 - Supabase planned for CRUD/persistence (optional; wire later as needed).
 
 **Best Practices**
+
 - Always create a brief plan before implementing a task and get approval to execute when collaborating. Do not auto‑execute large changes without agreement.
 - Keep it simple and make it work (KISS). Avoid speculative features (YAGNI). Follow clean code practices.
 - Reuse existing components where possible (`client/components`). If new, add under an appropriate subfolder there and make it theme‑aware.
@@ -185,12 +195,14 @@ These rules combine our internal `.cursor/rules/general.mdc` with the repo’s c
 - Do not use emojis in logs.
 
 **Implementation Rules**
+
 - Prefer client‑side changes. Only add server endpoints when strictly necessary (secrets, DB, private integrations).
 - Use NestJS controllers/services for backend work; avoid adding ad‑hoc Express routes.
 - Preserve streaming behavior: server uses AI SDK DataStream; client parses SSE `text-delta` and falls back to raw chunks.
 - Keep environment secrets on the server. Do not attempt to read local `.env` via agent/tooling calls.
 
 **MCP Usage (JIRA Automation)**
+
 - MCP must be used for supported deterministic queries. Communication is STDIO and JSON‑RPC 2, or HTTP if configured.
 - The companion MCP server (`hello_world_mcp`) is included in this repo. Use `pnpm dev:mcp` when available.
 
@@ -328,24 +340,20 @@ The application provides these API endpoints for MCP interaction:
 - `POST /api/mcp/tool` - Execute MCP tool call
 - `POST /api/mcp/resource` - Read MCP resource
 
-### HTTP‑only Mode (No Spawn)
+### Fixture/Internal Adapter Mode
 
-If spawning a local MCP process is not allowed in your environment, enable HTTP‑only mode:
-
-1. Provide an HTTP MCP endpoint (or an adapter) and set:
+For deterministic local runs and CI, the server can serve MCP responses from fixtures without spawning an external MCP process. Enable fixtures:
 
 ```
-MCP_BASE_URL=http://127.0.0.1:4000
-MCP_NO_SPAWN=true
+MCP_USE_FIXTURES=1
 ```
 
-2. Without an external MCP, the server provides a minimal internal adapter (no spawn) that supports:
-   - Tools: `process_text`, `fetch_jira_ticket`
-   - Resources: `mcp://local-mcp-server/jira/projects`
+With fixtures on, a minimal internal adapter is used (no spawn) that supports:
 
-It uses your Jira env vars (`JIRA_BASE_URL`, `JIRA_EMAIL`, `JIRA_API_TOKEN`) and returns the same response shapes as MCP, so the client/UI requires no changes.
+- Tools: `process_text`, `fetch_jira_ticket`
+- Resources: `mcp://local-mcp-server/jira/projects`
 
-3. To revert to stdio MCP in dev, unset `MCP_NO_SPAWN` and leave `MCP_BASE_URL` empty.
+It reads Jira values from `JIRA_BASE_URL`, `JIRA_EMAIL`, `JIRA_API_TOKEN` when needed and returns MCP‑compatible response shapes, so the client/UI requires no changes. To use a real MCP via stdio instead, unset `MCP_USE_FIXTURES` and configure `MCP_SERVER_PATH`.
 
 ## How It Works
 
@@ -370,8 +378,14 @@ The MCP integration consists of these key files:
 
 - `client/lib/mcp-client.ts` - MCP client communication
 - `client/lib/query-matcher.ts` - Query pattern detection and response formatting
-- `server/routes/mcp.ts` - MCP proxy server endpoints
+- `server/mcp/*` - MCP proxy server (tools/resources, fixtures, adapters)
 - `start-with-mcp.js` - Convenience script to start both servers
+
+## E2E Tests
+
+- Run all: `pnpm test:e2e` (auto-starts Vite+Nest with fixtures enabled)
+- Or run against a manually started dev server: `pnpm dev:fixtures` then `pnpm test:e2e:noserver`
+- Specs live in `e2e/` and the config is `playwright.config.ts`.
 
 ## Example Response
 

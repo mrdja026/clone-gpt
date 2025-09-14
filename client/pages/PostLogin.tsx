@@ -4,11 +4,16 @@ import { ChatArea } from "@/components/chat/ChatArea";
 import type { Conversation, Message } from "@/components/chat/types";
 import { QuerySearch } from "@/components/QuerySearch";
 import { deterministicQueries } from "@/lib/queries";
+import { matchQuery, formatMCPResponse } from "@/lib/query-matcher";
+import { mcpClient } from "@/lib/mcp-client";
 import { cn } from "@/lib/utils";
 import { useNavigate, Link } from "react-router-dom";
-import { Moon, SunMedium } from "lucide-react";
+// icons used via ThemeToggle
 import AboutDialog from "@/components/AboutDialog";
 import AboutContent from "@/components/AboutContent";
+import AppHeader from "@/components/AppHeader";
+import ProvidersMenu from "@/components/ProvidersMenu";
+import ThemeToggle from "@/components/ThemeToggle";
 
 function uid(prefix = "id") {
   return `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
@@ -62,9 +67,7 @@ async function callModelStreaming(
 
 export default function PostLogin() {
   const navigate = useNavigate();
-  const [dark, setDark] = useState<boolean>(() =>
-    document.documentElement.classList.contains("dark"),
-  );
+  // Theme is controlled via ThemeToggle component
   const [pendingPrompt, setPendingPrompt] = useState<string | undefined>(undefined);
   const [conversations, setConversations] = useState<Conversation[]>([
     { id: uid("conv"), title: "New chat", messages: [], createdAt: Date.now() },
@@ -81,12 +84,21 @@ export default function PostLogin() {
     [conversations, activeGroup],
   );
 
-  const setTheme = (enabled: boolean) => {
-    setDark(enabled);
-    document.documentElement.classList.toggle("dark", enabled);
-  };
+  // no-op
 
   const onSend = async (text: string) => {
+    // Detect opt-in ping token and strip it from the prompt
+    const wantsPing = /\bDO\s+PING\b/i.test(text);
+    const cleanedText = text.replace(/\bDO\s+PING\b/gi, "").trim();
+    if (wantsPing) {
+      // Fire-and-forget ping; do not block the chat flow
+      fetch("/api/ping-alert", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: "Prompt completed" }),
+      }).catch(() => {});
+    }
+
     const userMessage: Message = {
       id: uid("m"),
       role: "user",
@@ -97,11 +109,11 @@ export default function PostLogin() {
     const botMessage: Message = {
       id: botMessageId,
       role: "assistant",
-      content: "",
+      content: "Analyzing…",
       createdAt: Date.now(),
     };
 
-    // Add messages immediately
+    // Add user and empty bot message immediately
     setConversations((prev) =>
       prev.map((c) =>
         c.id === activeId
@@ -110,19 +122,100 @@ export default function PostLogin() {
       ),
     );
 
-    let full = "";
+    // MCP matching for deterministic queries
+    const queryMatch = matchQuery(cleanedText);
+    let mcpResults = "";
+    let enhancedPrompt = cleanedText;
+
+    if (queryMatch.isMatch && queryMatch.mcpActions.length > 0) {
+      // Update bot message to show MCP processing
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.id === activeId
+            ? {
+                ...c,
+                messages: c.messages.map((m) =>
+                  m.id === botMessageId
+                    ? { ...m, content: "🔍 Fetching data from JIRA..." }
+                    : m,
+                ),
+              }
+            : c,
+        ),
+      );
+
+      try {
+        const mcpPromises = queryMatch.mcpActions.map(async (action) => {
+          try {
+            const response = await mcpClient.executeAction(action);
+            const responseText =
+              ("content" in response
+                ? response.content?.[0]?.text
+                : response.contents?.[0]?.text) || "No data returned";
+            return formatMCPResponse(action, responseText);
+          } catch (err) {
+            return `❌ Failed to execute ${action.description}: ${err instanceof Error ? err.message : "Unknown error"}`;
+          }
+        });
+        const mcpResultsArray = await Promise.all(mcpPromises);
+        mcpResults = mcpResultsArray.join("\n\n");
+
+        enhancedPrompt = queryMatch.enhancedPrompt
+          ? `${queryMatch.enhancedPrompt}\n\nRetrieved Data:\n${mcpResults}`
+          : `${cleanedText}\n\nRetrieved Data:\n${mcpResults}`;
+
+        // Show analyzing placeholder so tests can find it
+        setConversations((prev) =>
+          prev.map((c) =>
+            c.id === activeId
+              ? {
+                  ...c,
+                  messages: c.messages.map((m) =>
+                    m.id === botMessageId
+                      ? { ...m, content: `${mcpResults}\n\n🤖 Analyzing data...` }
+                      : m,
+                  ),
+                }
+              : c,
+          ),
+        );
+      } catch (err) {
+        mcpResults = `❌ Failed to retrieve data: ${err instanceof Error ? err.message : "Unknown error"}`;
+        setConversations((prev) =>
+          prev.map((c) =>
+            c.id === activeId
+              ? {
+                  ...c,
+                  messages: c.messages.map((m) =>
+                    m.id === botMessageId ? { ...m, content: mcpResults } : m,
+                  ),
+                }
+              : c,
+          ),
+        );
+        return;
+      }
+    }
+
+    // Stream model response
+    const conversationHistory = conversations.find((c) => c.id === activeId)?.messages || [];
+    let llmResponse = "";
     try {
-      full = await callModelStreaming(
-        text,
-        conversations.find((c) => c.id === activeId)?.messages || [],
+      await callModelStreaming(
+        enhancedPrompt,
+        conversationHistory,
         (chunk) => {
+          llmResponse += chunk;
+          const currentContent = mcpResults ? `${mcpResults}\n\n**Analysis:**\n` : "";
           setConversations((prev) =>
             prev.map((c) =>
               c.id === activeId
                 ? {
                     ...c,
                     messages: c.messages.map((m) =>
-                      m.id === botMessageId ? { ...m, content: (m.content || "") + chunk } : m,
+                      m.id === botMessageId
+                        ? { ...m, content: currentContent + llmResponse }
+                        : m,
                     ),
                   }
                 : c,
@@ -132,13 +225,14 @@ export default function PostLogin() {
       );
     } finally {
       // Ensure final content is set
+      const finalContent = mcpResults ? `${mcpResults}\n\n**Analysis:**\n${llmResponse}` : llmResponse;
       setConversations((prev) =>
         prev.map((c) =>
           c.id === activeId
             ? {
                 ...c,
                 messages: c.messages.map((m) =>
-                  m.id === botMessageId ? { ...m, content: full || m.content } : m,
+                  m.id === botMessageId ? { ...m, content: finalContent || m.content } : m,
                 ),
               }
             : c,
@@ -155,7 +249,7 @@ export default function PostLogin() {
           messages: [
             ...base.messages,
             userMessage,
-            { ...botMessage, content: full || botMessage.content },
+            { ...botMessage, content: llmResponse || botMessage.content },
           ],
         }
       : undefined;
@@ -171,8 +265,9 @@ export default function PostLogin() {
       if (finalConv) localStorage.setItem(STORAGE_ACTIVE, finalConv.id);
     } catch {}
 
-    // Go to full chat view after receiving response
-    navigate("/chat");
+    // Persist into main chat storage and optionally navigate
+    // Keep user on PostLogin per task; still persist for continuity
+    // navigate("/chat");
   };
 
   const onBranchFrom = (messageId: string) => {
@@ -198,29 +293,17 @@ export default function PostLogin() {
 
   return (
     <div className="min-h-screen grid grid-rows-[auto,1fr]">
-      <header className="border-b bg-card">
-        <div className="container mx-auto flex items-center justify-between py-3">
-          <div className="flex items-center gap-3">
-            <div className="h-7 w-7 rounded-md bg-primary" />
-            <div>
-              <div className="font-semibold">JiraGPT</div>
-              <div className="text-xs text-muted-foreground">Your Jira co-pilot</div>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
+      <AppHeader
+        subtitle="Your Jira co-pilot"
+        right={
+          <>
             <AboutDialog trigger={<Button variant="ghost" size="sm">About</Button>} />
+            <ProvidersMenu />
             <Button variant="ghost" size="sm" onClick={() => navigate("/chat")}>Open Full Chat</Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label="Toggle theme"
-              onClick={() => setTheme(!dark)}
-            >
-              {dark ? <SunMedium className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            </Button>
-          </div>
-        </div>
-      </header>
+            <ThemeToggle />
+          </>
+        }
+      />
 
       <main className="container mx-auto py-12 md:py-16">
         {/* Hero */}
@@ -261,6 +344,37 @@ export default function PostLogin() {
               }
               initialPrompt={pendingPrompt}
             />
+          </div>
+        </section>
+
+        {/* Connect to provider */}
+        <section className="mt-12">
+          <div className="mx-auto max-w-5xl">
+            <h2 className="text-lg font-semibold mb-4">Connect to provider</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="rounded-xl border bg-card p-5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="font-medium">Perplexity</div>
+                    <div className="text-sm text-muted-foreground">Set up your Perplexity credentials</div>
+                  </div>
+                  <Button asChild>
+                    <Link to="/providers/perplexity">Open</Link>
+                  </Button>
+                </div>
+              </div>
+              <div className="rounded-xl border bg-card p-5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="font-medium">Notion</div>
+                    <div className="text-sm text-muted-foreground">Set up your Notion credentials</div>
+                  </div>
+                  <Button asChild>
+                    <Link to="/providers/notion">Open</Link>
+                  </Button>
+                </div>
+              </div>
+            </div>
           </div>
         </section>
 
