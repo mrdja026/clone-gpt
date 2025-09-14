@@ -2,6 +2,7 @@ import "reflect-metadata";
 import { NestFactory } from "@nestjs/core";
 import { ValidationPipe } from "@nestjs/common";
 import { AppModule } from "./app.module";
+import { startOllamaProxyIfNeeded } from "./utils/ollama-proxy";
 import { verifyMcpJwt } from "./middleware/jwt";
 import { measureMcpLatency } from "./middleware/timing";
 
@@ -9,6 +10,15 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     logger: ["error", "warn", "log", "debug"],
   });
+
+  // Ensure 127.0.0.1:11434 forwards to Windows Ollama when not running in WSL
+  // Only activates when OPENAI_BASE_URL targets localhost and the requested model
+  // is missing locally. Safe no-op if port is already bound or model exists.
+  try {
+    await startOllamaProxyIfNeeded();
+  } catch (e) {
+    console.warn("[OllamaProxy] setup skipped:", (e as any)?.message || e);
+  }
 
   // Enable CORS for frontend
   app.enableCors({

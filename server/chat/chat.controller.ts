@@ -53,7 +53,7 @@ export class ChatController {
       const tools = {
         fetch_jira_ticket: {
           description: "Fetch a Jira ticket by key (e.g., SCRUM-8)",
-          parameters: z.object({ ticketKey: z.string() }),
+          inputSchema: z.object({ ticketKey: z.string() }),
           execute: async ({ ticketKey }: { ticketKey: string }) => {
             const resp = await axios.post(`${apiBase}/mcp/tool`, {
               name: "fetch_jira_ticket",
@@ -66,7 +66,7 @@ export class ChatController {
         },
         list_jira_projects: {
           description: "List Jira projects",
-          parameters: z.object({}).optional(),
+          inputSchema: z.object({}),
           execute: async () => {
             const resp = await axios.post(`${apiBase}/mcp/resource`, {
               uri: "mcp://local-mcp-server/jira/projects",
@@ -77,7 +77,7 @@ export class ChatController {
         },
         get_current_sprint_summary: {
           description: "Get current sprint summary",
-          parameters: z.object({}).optional(),
+          inputSchema: z.object({}),
           execute: async () => {
             // Use MCP resource for current sprint
             const resp = await axios.post(`${apiBase}/mcp/resource`, {
@@ -162,7 +162,7 @@ export class ChatController {
       const tools = {
         fetch_jira_ticket: {
           description: "Fetch a Jira ticket by key (e.g., SCRUM-8)",
-          parameters: z.object({ ticketKey: z.string() }),
+          inputSchema: z.object({ ticketKey: z.string() }),
           execute: async ({ ticketKey }: { ticketKey: string }) => {
             const resp = await axios.post(`${apiBase}/mcp/tool`, {
               name: "fetch_jira_ticket",
@@ -174,7 +174,7 @@ export class ChatController {
         },
         list_jira_projects: {
           description: "List Jira projects",
-          parameters: z.object({}).optional(),
+          inputSchema: z.object({}),
           execute: async () => {
             const resp = await axios.post(`${apiBase}/mcp/resource`, {
               uri: "mcp://local-mcp-server/jira/projects",
@@ -185,7 +185,7 @@ export class ChatController {
         },
         get_current_sprint_summary: {
           description: "Get current sprint summary",
-          parameters: z.object({}).optional(),
+          inputSchema: z.object({}),
           execute: async () => {
             const resp = await axios.post(`${apiBase}/mcp/resource`, {
               uri: "mcp://local-mcp-server/jira/current-sprint",
