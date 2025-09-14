@@ -93,9 +93,9 @@ Goal: Identify and fix 401/405 errors when using MCP endpoints, verify fixture-b
   - Added `e2e/mcp-sprint.spec.ts`.
 - Removed external Repo B / stdio MCP references and code.
 
-### Items Removed
+### Items Removed (confirmed)
 
-- Deleted: `server/routes/mcp.ts`, `start-with-mcp.(js|mjs)`, `test-mcp.js`, and the `hello_world_mcp` folder under this repo.
+- Deleted: `server/routes/mcp.ts`, `start-with-mcp.(js|mjs)`, `test-mcp.js`, and the `hello_world_mcp` folder (confirmed removed from the repo).
 - Cleaned `.env`, `README.md`, `session.md`, `AGENTS.md` to drop Repo B instructions and stdio flow; only built‑in adapters/fixtures or optional HTTP MCP remain.
 
 ### Possible Bugs / Pitfalls
