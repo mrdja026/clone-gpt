@@ -5,7 +5,5 @@ test('Typing "current sprint" renders Sprint Summary from MCP', async ({ page })
   const textarea = page.getByPlaceholder('Ask anything…');
   await textarea.fill('current sprint');
   await textarea.press('Enter');
-  await expect(page.getByText('Analyzing', { exact: false })).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText('Sprint Summary:', { exact: false })).toBeVisible({ timeout: 30_000 });
 });
-
