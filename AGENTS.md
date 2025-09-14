@@ -24,7 +24,7 @@ client/                   # React SPA frontend
 server/                   # NestJS API backend
 ├── main.ts               # Nest bootstrap (bind host/port, global prefix /api)
 ├── app.module.ts         # Root module (controllers/providers)
-├── controllers/          # HTTP controllers (e.g., ping, demo, healthz, ping-alert)
+├── controllers/          # HTTP controllers (e.g., ping, demo, healthz)
 ├── mcp/                  # MCP controller/service for tools/resources
 └── fixtures/             # Dev/test fixtures (e.g., Jira SCRUM-8)
 
@@ -86,7 +86,6 @@ className={cn(
 - `GET /api/mcp/tools` - List MCP tools (via MCP service)
 - `POST /api/mcp/tool` - Call MCP tool
 - `POST /api/mcp/resource` - Read MCP resource
-- `POST /api/ping-alert` - Triggers local ping (with terminal-bell fallback)
 
 ### Shared Types
 
@@ -201,7 +200,7 @@ Behave like my second brain. Work through the problem until you’d naturally st
 
 - WSL2 specifics (from session.md)
   - Dev proxy: Vite 8080 → Nest 3001. Ports must be free; use `ss -ltnp | rg ':3001|:8080'` to check conflicts.
-  - Auto-open + ping on ready: `pnpm dev:fixtures:open` (uses `scripts/open-on-ready.sh` to wait for the app, open a Windows browser via `wslview`/`cmd.exe`, and ping `/api/ping-alert`).
+  - Auto-open helper: `pnpm dev:fixtures:open` (uses `scripts/open-on-ready.sh` to wait for the app and open a Windows browser via `wslview`/`cmd.exe`).
   - If localhost bridging fails, get the WSL IP and open `http://<WSL_IP>:<vite_port>`.
 
 - MCP fixtures and types

@@ -19,10 +19,4 @@ else
   echo "[open-on-ready] No browser opener found; please open $APP_URL manually."
 fi
 
-# Fire-and-forget ping to confirm readiness (server falls back to bell)
-curl -s -X POST "$APP_URL/api/ping-alert" \
-  -H 'Content-Type: application/json' \
-  -d '{"message":"Dev server ready"}' >/dev/null 2>&1 || true
-
 echo "[open-on-ready] Done."
-
