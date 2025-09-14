@@ -69,3 +69,52 @@ Goal: Identify and fix 401/405 errors when using MCP endpoints, verify fixture-b
 
 - Random free-text prompts should continue to work; SCRUM-8 is the deterministic fixture for verification.
 - If localhost bridging fails on WSL2, get WSL IP and open `http://<WSL_IP>:8080` as documented in `session.md`.
+
+---
+
+## Update — Current Findings and Fixes (WSL2 + Windows Ollama)
+
+### Findings
+
+- LLM 404 “model not found” errors were caused by 127.0.0.1 inside WSL pointing to a different Ollama instance (or none), while the desired model `branko:latest` exists on the Windows host.
+- Listing models from WSL `http://127.0.0.1:11434/v1/models` returned a set that did not include `branko:latest`, confirming the mismatch.
+- Direct Windows PowerShell showed `branko:latest` available and interactive, confirming the correct target is Windows Ollama.
+
+### Implemented Fixes
+
+- Auto‑proxy on server startup: if `OPENAI_BASE_URL` targets `http://127.0.0.1:11434/v1` and the `MODEL_NAME` is not present locally, the Nest server now attempts to bind a lightweight HTTP proxy on `127.0.0.1:11434` that forwards to the Windows host IP (detected from `/etc/resolv.conf` or `WINDOWS_OLLAMA_HOST_IP`).
+  - File: `server/utils/ollama-proxy.ts`
+  - Hooked in `server/main.ts` via `startOllamaProxyIfNeeded()`.
+  - Safe no‑op if port 11434 is already taken, or model exists locally.
+- Chat tool bridge corrected to AI SDK’s `ToolSet` shape and `localhost` URL typo fixed.
+- MCP sprint support: added `mcp://local-mcp-server/jira/current-sprint` resource and `get_current_sprint_summary` tool (fixtures + optional Agile API).
+- Diagnostics and e2e:
+  - Script: `scripts/check-mcp.sh` (`pnpm run check:mcp`).
+  - Added `e2e/mcp-sprint.spec.ts`.
+- Removed external Repo B / stdio MCP references and code.
+
+### Items Removed
+
+- Deleted: `server/routes/mcp.ts`, `start-with-mcp.(js|mjs)`, `test-mcp.js`, and the `hello_world_mcp` folder under this repo.
+- Cleaned `.env`, `README.md`, `session.md`, `AGENTS.md` to drop Repo B instructions and stdio flow; only built‑in adapters/fixtures or optional HTTP MCP remain.
+
+### Possible Bugs / Pitfalls
+
+- If something else binds `127.0.0.1:11434` inside WSL, the auto‑proxy cannot bind; the server logs a skip and LLM requests will continue to hit the local port (which may not have `branko:latest`).
+- Windows Ollama must listen on `0.0.0.0` and Windows Firewall must allow inbound TCP 11434; otherwise WSL cannot reach the host IP and the proxy will forward to an unreachable target.
+- When calling `/api/mcp/resource` directly, it must be a POST with a JSON body `{ "uri": "..." }`; calling without a body returns 500 (bad request shape).
+
+### How to Verify (WSL)
+
+1) Ensure `OPENAI_BASE_URL=http://127.0.0.1:11434/v1` and `MODEL_NAME=branko:latest` in `.env`.
+2) Free the port inside WSL if taken: `ss -ltnp | grep ':11434'` → `kill -9 <PID>`.
+3) On Windows, set `OLLAMA_HOST=0.0.0.0` and restart the Ollama service; open firewall for TCP 11434.
+4) Run app: `pnpm dev`.
+   - On startup, server prints when the proxy forwards 127.0.0.1 → Windows IP if the model is missing locally.
+5) Confirm models: `curl -s http://127.0.0.1:11434/v1/models | jq -r '.data[].id'` includes `branko:latest`.
+6) Exercise MCP and chat (fixtures first): `pnpm run check:mcp`, then use the UI with `SCRUM-8` and `current sprint`.
+
+### Next Steps
+
+- Add a clearer log line when the auto‑proxy activates and when it skips due to EADDRINUSE.
+- Optionally add a health subfield to `/api/healthz` indicating proxy status and Windows target IP.

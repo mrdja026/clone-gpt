@@ -197,6 +197,25 @@ Links
     - `server/fixtures/jira/SCRUM-8.json` — Fixture data for SCRUM-8.
   - Shared
     - `shared/api.ts` — Added `JiraTicket` type.
+
+## Follow‑Up — WSL2 Ollama Bridging and Proxy
+
+Goal: Keep `OPENAI_BASE_URL=http://127.0.0.1:11434/v1` in WSL while using Windows Ollama hosting `branko:latest`.
+
+Steps:
+
+- Ensure `.env` has `MODEL_NAME=branko:latest` and `OPENAI_BASE_URL=http://127.0.0.1:11434/v1`.
+- Free WSL port 11434 if taken: `ss -ltnp | grep ':11434'` → stop that process.
+- On Windows, set `OLLAMA_HOST=0.0.0.0` and restart the Ollama service; allow TCP 11434 in the firewall.
+- Start app: `pnpm dev`.
+  - On startup, the server checks if `branko:latest` is present locally; if missing, it autostarts a tiny proxy that binds `127.0.0.1:11434` and forwards to the Windows host IP (from `/etc/resolv.conf` or `WINDOWS_OLLAMA_HOST_IP`).
+- Verify forwarding by listing models from WSL: `curl -s http://127.0.0.1:11434/v1/models | jq -r '.data[].id'` → must include `branko:latest`.
+- If forwarding doesn’t engage, check logs for `[OllamaProxy]` and ensure 11434 is free in WSL.
+
+Known pitfalls:
+
+- If `127.0.0.1:11434` is already bound in WSL, the proxy skips; free the port.
+- If Windows Ollama is bound only to `127.0.0.1`, WSL can’t reach it; ensure `0.0.0.0` and firewall allow.
   - Scripts
     - `scripts/dev-with-logs.sh` — Runs dev and saves combined logs.
     - `scripts/open-on-ready.sh` — Waits for app, opens browser (WSL2-aware), pings alert.
@@ -309,3 +328,5 @@ Session logged at: 2025-09-14T06:44:16.447Z
 Session logged at: 2025-09-14T08:19:27.206Z
 
 Session logged at: 2025-09-14T10:58:50.277Z
+
+Session logged at: 2025-09-14T12:34:17.547Z

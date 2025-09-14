@@ -216,22 +216,24 @@ pnpm dev
 
 The app will now use your local Ollama models instead of OpenAI!
 
-### WSL2: Windows Ollama via localhost
+### WSL2: Windows Ollama via localhost (Auto‑Proxy)
 
-If Ollama runs on Windows (not inside WSL) and you still want to use `OPENAI_BASE_URL=http://127.0.0.1:11434/v1` in WSL, run the local proxy that forwards to the Windows host IP:
+If Ollama runs on Windows (not inside WSL) and you want to keep `OPENAI_BASE_URL=http://127.0.0.1:11434/v1` in WSL:
 
 ```bash
-# Set your Windows host IP if different
-export WINDOWS_OLLAMA_HOST_IP=192.168.128.1
+# Windows (PowerShell as admin):
+# Listen externally and allow inbound TCP 11434
+setx OLLAMA_HOST 0.0.0.0
+# Restart the Ollama service and open port 11434 in Windows Firewall
 
-# Start proxy + dev (fixtures)
-pnpm dev:fixtures:with-proxy
+# WSL: free port 11434 if in use
+ss -ltnp | grep ':11434'   # kill the PID if needed
 
-# Or proxy + dev
-pnpm dev:with-proxy
+# Start app normally
+pnpm dev
 ```
 
-This binds `127.0.0.1:11434` in WSL and forwards to `http://$WINDOWS_OLLAMA_HOST_IP:11434` so the app can keep using localhost.
+The server checks if your `MODEL_NAME` (e.g., `branko:latest`) exists at `127.0.0.1:11434` inside WSL. If not, it binds a tiny proxy on `127.0.0.1:11434` and forwards to the Windows host IP (detected from `/etc/resolv.conf` or `WINDOWS_OLLAMA_HOST_IP`). If `127.0.0.1:11434` is already in use in WSL, the proxy is skipped.
 
 ### Supported Models
 
