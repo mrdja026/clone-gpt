@@ -112,10 +112,10 @@ Links
   - Update e2e to assert against the real contract (success path and error path separately) without requiring the API to emit malformed data.
   - If mocking is desired, move it to the test harness (network stub) rather than the live API code.
 
-## E2E: MCP SCRUM-8 + DO PING
+## E2E: MCP SCRUM-8
 
 - Goal
-  - Verify the MCP flow for a bare Jira key (SCRUM-8) renders the ticket details from fixtures and that adding `DO PING` triggers the ping endpoint.
+  - Verify the MCP flow for a bare Jira key (SCRUM-8) renders the ticket details from fixtures and that adding triggers the ping endpoint.
 
 - Setup
   - Dev server auto-start via Playwright config at `playwright.config.ts` with `MCP_USE_FIXTURES=1 pnpm dev`.
@@ -164,14 +164,13 @@ Links
   - Open `http://<WSL_IP>:8080` in Windows
 
 - What the test does
-  - Opens `/`, types `SCRUM-8 DO PING`, presses Enter.
+  - Opens `/`, types `SCRUM-8`, presses Enter.
   - Waits for UI to show MCP-rendered details (Summary, Assignee, Description) from `server/fixtures/jira/SCRUM-8.json`.
-  - Asserts `POST /api/ping-alert` was called (without relying on audio).
 
 ## E2E Happy Path — Completed
 
 - Summary
-  - The end-to-end flow for a Jira ticket key (SCRUM-8) is implemented and tested. The UI retrieves fixture data via MCP, renders key fields, and triggers a ping when the prompt contains `DO PING`.
+  - The end-to-end flow for a Jira ticket key (SCRUM-8) is implemented and tested. The UI retrieves fixture data via MCP, renders key fields, and triggers a ping when the prompt contains `SCRUM-8`.
 
 - How to run (app)
   - Default (fixtures on): `pnpm dev:fixtures`
@@ -191,20 +190,17 @@ Links
 
 - Test specs
   - `e2e/home-smoke.spec.ts` — Homepage loads, input accepts text, basic UI reaction.
-  - `e2e/mcp-scrum8.spec.ts` — Enters `SCRUM-8 DO PING`, asserts Jira fixture details and that `/api/ping-alert` is called.
+- `e2e/mcp-scrum8.spec.ts` — Enters `SCRUM-8` and asserts Jira fixture details.
   - Config: `playwright.config.ts` (supports skipping webServer via `PW_SKIP_WEBSERVER=1`).
 
 - Logging and diagnostics
   - Dev logs runner: `pnpm dev:logs` → writes to `logs/dev_YYYYMMDD_HHMMSS.log`.
   - Health endpoint: `GET /api/healthz` (controller: `server/controllers/demo.controller.ts`).
   - Vite WSL2 hardened host: `vite.config.ts` (`host: true`, `strictPort: true`, HMR host set).
-  - Auto-open helper: `scripts/open-on-ready.sh` (waits for app, opens browser, and POSTs `/api/ping-alert` "Dev server ready").
+- Auto-open helper: `scripts/open-on-ready.sh` (waits for app and opens the browser).
 
 - Notable changes (by file)
   - Client
-    - `client/pages/Index.tsx` — Detects and strips `DO PING`, calls `/api/ping-alert` asynchronously.
-  - Server
-    - `server/controllers/ping-alert.controller.ts` (+ `server/app.module.ts`) — Ping endpoint (GET/POST) with fallback bell.
     - `server/controllers/demo.controller.ts` — Added `GET /api/healthz` for diagnostics.
     - `server/main.ts` — Verbose logging and `BIND_HOST` support (binds `0.0.0.0` by default).
     - `vite.config.ts` — WSL2-friendly Vite config; proxy target accepts `API_PORT` env.
@@ -316,42 +312,6 @@ Session logged at: 2025-09-13T19:08:02.228Z
 
 Session logged at: 2025-09-13T19:13:05.112Z
 
-## Ping-on-Completion (DO PING)
-
-- Goal
-  - When I add the token `DO PING` in the prompt, the app should always trigger a local ping sound/notification on completion without extra permission prompts.
-
-- What I implemented
-  - Client: Detects `DO PING` (case-insensitive) in the input, strips it from the text used for processing, and asynchronously calls a new server endpoint to trigger the ping.
-  - Server: Added `POST /api/ping-alert` (and `GET /api/ping-alert` test route) that:
-    - Attempts to run `/home/mrdjan/event-codex/tools/ping-alert.sh <message>`.
-    - Falls back to emitting a terminal bell if the script or dependencies are missing.
-    - Always allowed in dev (no extra auth), fire-and-forget, does not block UI.
-
-- Files changed
-  - `client/pages/Index.tsx` — detects and strips `DO PING`; calls `/api/ping-alert`.
-  - `server/controllers/ping-alert.controller.ts` — new controller that spawns the external script or falls back to a bell.
-  - `server/app.module.ts` — registers the PingAlertController.
-
-- Build fix for ping script
-  - The external script previously errored with: “Cannot find ping-alert CLI. Run \"npm run build\" or install dependencies.”
-  - Fixed by making the server endpoint tolerant:
-    - If `/home/mrdjan/event-codex/tools/ping-alert.sh` exists: it is invoked directly.
-    - If not present or fails: we still signal via terminal bell, so the notification always works.
-  - Optional: to enable full audio in your environment, prepare the external repo once:
-    1. `cd /home/mrdjan/event-codex`
-    2. `pnpm i && pnpm build`
-    3. Test: `./tools/ping-alert.sh --no-audio "build complete"`
-    4. If your script lives elsewhere, set `PING_ALERT_SCRIPT=/custom/path/to/ping-alert.sh` in `.env`.
-
-- Usage
-  - In the UI prompt, append `DO PING` anywhere. Example: `Fetch SCRUM-8 details DO PING`.
-  - The token is removed from the content sent to tools/LLM; only the notification is triggered.
-  - Endpoint: `POST /api/ping-alert` body `{ message?: string, noAudio?: boolean }` (client sends a default message).
-
-- Notes
-  - This endpoint is intentionally lightweight and open in dev; if you lock down routes later, keep this one permitted or gate it with a local-only check as needed.
-
 ## Auto-open Browser
 
 - Command
@@ -360,7 +320,7 @@ Session logged at: 2025-09-13T19:13:05.112Z
 - Behavior
   - Starts dev servers with fixtures and waits for `http://localhost:8080`.
   - Automatically opens your Windows browser via `wslview`/`cmd.exe` (falls back to `xdg-open`).
-  - Triggers `POST /api/ping-alert` with message "Dev server ready" (server falls back to a terminal bell if the external script is unavailable).
+  - Removed ping-on-ready; no server-side ping integration remains.
 
 - Scripts
   - `scripts/open-on-ready.sh` — waits on the app URL, opens the browser, and pings the alert endpoint.
@@ -369,3 +329,5 @@ Session logged at: 2025-09-13T19:13:05.112Z
 Session logged at: 2025-09-13T22:48:45.867Z
 
 Session logged at: 2025-09-14T06:44:16.447Z
+
+Session logged at: 2025-09-14T08:19:27.206Z

@@ -4,10 +4,10 @@ import { ChatModule } from "./chat/chat.module";
 import { SupabaseModule } from "./supabase/supabase.module";
 import { ServicesModule } from "./services/services.module";
 import { DemoController } from "./controllers/demo.controller";
-import { PingAlertController } from "./controllers/ping-alert.controller";
 import { ChatsController } from "./controllers/chats.controller";
 import { QueryTemplatesController } from "./controllers/query-templates.controller";
 import { McpModule } from "./mcp/mcp.module";
+import { JiraController } from "./controllers/jira.controller";
 
 @Module({
   imports: [
@@ -24,7 +24,8 @@ import { McpModule } from "./mcp/mcp.module";
     DemoController,
     ChatsController,
     QueryTemplatesController,
-    PingAlertController,
+    
+    JiraController,
   ],
   providers: [],
 })

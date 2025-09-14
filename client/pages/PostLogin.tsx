@@ -87,17 +87,8 @@ export default function PostLogin() {
   // no-op
 
   const onSend = async (text: string) => {
-    // Detect opt-in ping token and strip it from the prompt
-    const wantsPing = /\bDO\s+PING\b/i.test(text);
-    const cleanedText = text.replace(/\bDO\s+PING\b/gi, "").trim();
-    if (wantsPing) {
-      // Fire-and-forget ping; do not block the chat flow
-      fetch("/api/ping-alert", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: "Prompt completed" }),
-      }).catch(() => {});
-    }
+    // Use the input as-is
+    const cleanedText = text.trim();
 
     const userMessage: Message = {
       id: uid("m"),
