@@ -5,12 +5,14 @@ type Healthz = {
   port: string;
   host: string;
   env: Record<string, string>;
+  effectiveBaseUrl?: string;
   ollamaProxy: {
     active: boolean;
     baseUrl: string;
     checkedModel: string;
     targetHost?: string | null;
     note?: string | null;
+    port?: number | null;
   };
   time: string;
 };
@@ -46,12 +48,18 @@ export default function Diagnostics() {
             <div className="text-sm">Status: {data.status}</div>
             <div className="text-sm">Host: {data.host}</div>
             <div className="text-sm">Port: {data.port}</div>
+            {data.effectiveBaseUrl && (
+              <div className="text-sm break-all">Effective Base URL: {data.effectiveBaseUrl}</div>
+            )}
             <div className="text-xs text-muted-foreground mt-2">{data.time}</div>
           </div>
           <div className="rounded-xl border p-4 bg-card">
             <div className="font-medium mb-2">Ollama Proxy</div>
             <div className="text-sm">Active: {String(data.ollamaProxy.active)}</div>
             <div className="text-sm break-all">Base URL: {data.ollamaProxy.baseUrl}</div>
+            {typeof data.ollamaProxy.port !== 'undefined' && data.ollamaProxy.port !== null && (
+              <div className="text-sm">Proxy Port: {data.ollamaProxy.port}</div>
+            )}
             <div className="text-sm">Model: {data.ollamaProxy.checkedModel}</div>
             {data.ollamaProxy.targetHost && (
               <div className="text-sm">Target Host: {data.ollamaProxy.targetHost}</div>
@@ -76,4 +84,3 @@ export default function Diagnostics() {
     </div>
   );
 }
-
