@@ -181,7 +181,7 @@ const data: MyRouteResponse = await response.json();
 - Production-ready with multiple deployment options
 - Comprehensive UI component library included
 - Type-safe API communication via shared interfaces
-- MCP integration: optional external MCP via `MCP_SERVER_PATH`; fixtures via `MCP_USE_FIXTURES=1`.
+- MCP integration: built-in adapters by default; optional fixtures via `MCP_USE_FIXTURES=1`. You can point to an external HTTP MCP with `MCP_BASE_URL` if needed.
 - use general.mdc for coding .cursor/rules/general.mdc
 
 ## CODING
@@ -196,7 +196,7 @@ Behave like my second brain. Work through the problem until you’d naturally st
 
 - Fast logging loop
   - `pnpm dev:logs` — runs dev and writes combined logs to `logs/dev_YYYYMMDD_HHMMSS.log` (Vite + Nest). Inspect this file when the app appears to “hang”.
-  - Health: `GET /api/healthz` (see `server/controllers/demo.controller.ts`) to verify bind host/port and MCP path existence.
+  - Health: `GET /api/healthz` (see `server/controllers/demo.controller.ts`) to verify bind host/port and key env values.
 
 - WSL2 specifics (from session.md)
   - Dev proxy: Vite 8080 → Nest 3001. Ports must be free; use `ss -ltnp | rg ':3001|:8080'` to check conflicts.

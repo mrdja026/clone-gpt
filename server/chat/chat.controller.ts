@@ -19,6 +19,8 @@ import type {
 } from "./dto/persistent-chat.dto";
 import { streamText } from "ai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
+import axios from "axios";
+import { z } from "zod";
 
 @Controller("chat")
 export class ChatController {
@@ -45,8 +47,51 @@ export class ChatController {
       });
       const modelName = process.env.MODEL_NAME || "llama3.1:latest";
 
+      // Tool bridge: align with Repo B Modelfile tool names
+      const port = Number(process.env.PORT || 3001);
+      const apiBase = `http://localhost:${port}/api`;
+      const tools = {
+        fetch_jira_ticket: {
+          description: "Fetch a Jira ticket by key (e.g., SCRUM-8)",
+          parameters: z.object({ ticketKey: z.string() }),
+          execute: async ({ ticketKey }: { ticketKey: string }) => {
+            const resp = await axios.post(`${apiBase}/mcp/tool`, {
+              name: "fetch_jira_ticket",
+              arguments: { ticketKey },
+            });
+            // Our MCP returns { content: [{ type: 'text', text: JSON }] }
+            const text = resp.data?.content?.[0]?.text ?? "";
+            return typeof text === "string" ? text : JSON.stringify(resp.data);
+          },
+        },
+        list_jira_projects: {
+          description: "List Jira projects",
+          parameters: z.object({}).optional(),
+          execute: async () => {
+            const resp = await axios.post(`${apiBase}/mcp/resource`, {
+              uri: "mcp://local-mcp-server/jira/projects",
+            });
+            const text = resp.data?.contents?.[0]?.text ?? "";
+            return typeof text === "string" ? text : JSON.stringify(resp.data);
+          },
+        },
+        get_current_sprint_summary: {
+          description: "Get current sprint summary",
+          parameters: z.object({}).optional(),
+          execute: async () => {
+            // Use MCP resource for current sprint
+            const resp = await axios.post(`${apiBase}/mcp/resource`, {
+              uri: "mcp://local-mcp-server/jira/current-sprint",
+            });
+            const text = resp.data?.contents?.[0]?.text ?? "";
+            return typeof text === "string" ? text : JSON.stringify(resp.data);
+          },
+        },
+      } as const;
+
       const result = streamText({
         model: ollama.chatModel(modelName),
+        tools,
         system:
           chatRequest.systemPrompt ||
           "You are a helpful assistant that provides detailed analysis and suggestions for project management queries.",
@@ -111,8 +156,49 @@ export class ChatController {
       });
       const modelName = process.env.MODEL_NAME || "llama3.1:latest";
 
+      // Tool bridge (same as in streamChat)
+      const port = Number(process.env.PORT || 3001);
+      const apiBase = `http://localhost:${port}/api`;
+      const tools = {
+        fetch_jira_ticket: {
+          description: "Fetch a Jira ticket by key (e.g., SCRUM-8)",
+          parameters: z.object({ ticketKey: z.string() }),
+          execute: async ({ ticketKey }: { ticketKey: string }) => {
+            const resp = await axios.post(`${apiBase}/mcp/tool`, {
+              name: "fetch_jira_ticket",
+              arguments: { ticketKey },
+            });
+            const text = resp.data?.content?.[0]?.text ?? "";
+            return typeof text === "string" ? text : JSON.stringify(resp.data);
+          },
+        },
+        list_jira_projects: {
+          description: "List Jira projects",
+          parameters: z.object({}).optional(),
+          execute: async () => {
+            const resp = await axios.post(`${apiBase}/mcp/resource`, {
+              uri: "mcp://local-mcp-server/jira/projects",
+            });
+            const text = resp.data?.contents?.[0]?.text ?? "";
+            return typeof text === "string" ? text : JSON.stringify(resp.data);
+          },
+        },
+        get_current_sprint_summary: {
+          description: "Get current sprint summary",
+          parameters: z.object({}).optional(),
+          execute: async () => {
+            const resp = await axios.post(`${apiBase}/mcp/resource`, {
+              uri: "mcp://local-mcp-server/jira/current-sprint",
+            });
+            const text = resp.data?.contents?.[0]?.text ?? "";
+            return typeof text === "string" ? text : JSON.stringify(resp.data);
+          },
+        },
+      } as const;
+
       const result = await streamText({
         model: ollama.chatModel(modelName),
+        tools,
         system:
           chatRequest.systemPrompt ||
           "You are a helpful assistant that provides detailed analysis and suggestions for project management queries.",

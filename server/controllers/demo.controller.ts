@@ -1,6 +1,4 @@
 import { Controller, Get } from "@nestjs/common";
-import fs from "fs";
-import path from "path";
 import type { DemoResponse } from "../../shared/api";
 
 @Controller()
@@ -21,22 +19,19 @@ export class DemoController {
 
   @Get("healthz")
   healthz() {
-    const mcpServerPath = process.env.MCP_SERVER_PATH || "";
-    const exists = mcpServerPath ? fs.existsSync(mcpServerPath) : false;
     const port = process.env.PORT || "3001";
     const host = process.env.BIND_HOST || "0.0.0.0";
     return {
       status: "ok",
       port,
       host,
-      mcp: {
-        serverPath: mcpServerPath,
-        exists,
-        dirname: mcpServerPath ? path.dirname(mcpServerPath) : null,
-      },
       env: {
         MCP_USE_FIXTURES: process.env.MCP_USE_FIXTURES || "",
         JIRA_BASE_URL: process.env.JIRA_BASE_URL ? "set" : "",
+        OPENAI_BASE_URL: process.env.OPENAI_BASE_URL || "",
+        MODEL_NAME: process.env.MODEL_NAME || "",
+        JIRA_BOARD_ID: process.env.JIRA_BOARD_ID || "",
+        JIRA_PROJECT_KEY: process.env.JIRA_PROJECT_KEY || "",
       },
       time: new Date().toISOString(),
     };

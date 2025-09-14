@@ -13,7 +13,6 @@
   "scripts": {
     "dev": "concurrently -k -n NEST,VITE \"cross-env PORT=3001 tsx watch server/main.ts\" \"wait-on http://localhost:3001/api/ping && vite\"",
     "dev:server": "cross-env PORT=3001 tsx watch server/main.ts",
-    "dev:tail-mcp": "node ../hello_world_mpc/scripts/tail-log.js",
     "build": "npm run build:client && npm run build:server",
     "build:client": "vite build",
     "build:server": "vite build --config vite.config.server.ts",
@@ -22,9 +21,10 @@
     "test": "vitest --run",
     "format.fix": "prettier --write .",
     "typecheck": "tsc",
-    "dev:mcp": "concurrently -k -n APP,TAIL \"node start-with-mcp.mjs\" \"pnpm dev:tail-mcp\"",
-    "dev:test-mcp": "concurrently -k -n APP,TAIL \"cross-env USE_TEST_MCP=true node start-with-mcp.mjs\" \"pnpm dev:tail-mcp\"",
     "dev:fixtures": "cross-env MCP_USE_FIXTURES=1 pnpm dev",
+    "dev:ollama-proxy": "cross-env WINDOWS_OLLAMA_HOST_IP=192.168.128.1 node scripts/ollama-proxy.mjs",
+    "dev:with-proxy": "concurrently -k -n PROXY,APP \"node scripts/ollama-proxy.mjs\" \"pnpm dev\"",
+    "dev:fixtures:with-proxy": "concurrently -k -n PROXY,APP \"node scripts/ollama-proxy.mjs\" \"cross-env MCP_USE_FIXTURES=1 pnpm dev\"",
     "dev:logs": "bash scripts/dev-with-logs.sh",
     "dev:fixtures:open": "concurrently -n APP,OPEN \"cross-env MCP_USE_FIXTURES=1 pnpm dev\" \"bash scripts/open-on-ready.sh\"",
     "dev:p8081": "concurrently -k -n NEST,VITE \"cross-env PORT=3001 tsx watch server/main.ts\" \"wait-on http://localhost:3001/api/ping && vite --port 8081\"",
@@ -37,7 +37,8 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:noserver": "PW_SKIP_WEBSERVER=1 playwright test",
-    "playwright:install": "playwright install chromium"
+    "playwright:install": "playwright install chromium",
+    "check:mcp": "bash scripts/check-mcp.sh"
   },
   "dependencies": {
     "@ai-sdk/openai": "^2.0.30",

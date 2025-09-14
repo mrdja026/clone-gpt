@@ -13,7 +13,7 @@ Goal: Identify and fix 401/405 errors when using MCP endpoints, verify fixture-b
 - Start dev with fixtures: `pnpm dev:fixtures` (or `pnpm dev:fixtures:open`).
 - `GET /api/healthz` and record:
   - `MCP_USE_FIXTURES` value.
-  - `MCP_SERVER_PATH` Using local mcp which is in session.md as Repo B
+- External MCP is optional. Prefer direct Jira adapter or fixtures. If you run an HTTP MCP, set `MCP_BASE_URL`.
   - Jira env presence flags: `JIRA_BASE_URL`, `JIRA_EMAIL`, `JIRA_API_TOKEN`.
 - If you enabled route protection earlier, ensure `MCP_JWT_SECRET` is unset in dev; otherwise include a valid `Authorization: Bearer <token>` per README. - DO NOT TEST OR USE THIS OUT OF SCOPE
 

@@ -1,0 +1,16 @@
+{
+  "name": "Sprint 42",
+  "state": "active",
+  "startDate": "2025-09-01",
+  "endDate": "2025-09-15",
+  "goal": "Deliver onboarding improvements and analytics cleanup",
+  "summary": "Working on onboarding tooltips, analytics normalization, and performance fixes.",
+  "stats": {
+    "issuesTotal": 28,
+    "issuesCompleted": 17,
+    "issuesInProgress": 6,
+    "issuesBlocked": 2,
+    "storyPointsTotal": 89,
+    "storyPointsCompleted": 54
+  }
+}
