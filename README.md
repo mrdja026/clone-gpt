@@ -400,7 +400,7 @@ PORT=3000
 
 # Model Context Protocol (MCP) Integration
 
-This application integrates with MCP to enhance JIRA workflow automation. The system detects deterministic queries and executes MCP tool/resource calls to fetch data. No external MCP repo is required; the server provides built‑in adapters and supports fixtures.
+This application integrates with MCP to enhance JIRA workflow automation. The system detects deterministic queries and executes MCP tool/resource calls to fetch data. No external MCP repo is required; the server provides built‑in adapters and supports fixtures. The legacy `hello_world_mcp` example has been removed as part of repo cleanup.
 
 ## Supported Deterministic Queries
 

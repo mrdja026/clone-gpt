@@ -190,12 +190,13 @@ Links
 - Auto-open helper: `scripts/open-on-ready.sh` (waits for app and opens the browser).
 
 - Notable changes (by file)
-  - Client
+  - Client/Server
     - `server/controllers/demo.controller.ts` — Added `GET /api/healthz` for diagnostics.
     - `server/main.ts` — Verbose logging and `BIND_HOST` support (binds `0.0.0.0` by default).
     - `vite.config.ts` — WSL2-friendly Vite config; proxy target accepts `API_PORT` env.
     - `server/mcp/mcp.service.ts` — `MCP_USE_FIXTURES` toggle for Jira ticket fixtures.
     - `server/fixtures/jira/SCRUM-8.json` — Fixture data for SCRUM-8.
+    - Repo cleanup — removed legacy `hello_world_mcp/` example to avoid confusion.
   - Shared
     - `shared/api.ts` — Added `JiraTicket` type.
 
@@ -333,3 +334,5 @@ I have a script (`scripts/upstash`) to interact with my Upstash Redis database.
 I can use this to **store, fetch, and clean up test data** directly in my Codex sessions (via `functions.shell`).
 
 Session logged at: 2025-09-14T18:13:25.357Z
+
+Session logged at: 2025-09-14T18:17:47.307Z
