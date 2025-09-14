@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Simple Upstash Redis REST helper
+# Requires: UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN
+# Usage:
+#   scripts/upstash get <key>
+#   scripts/upstash set <key> <value>
+
+BASE="${UPSTASH_REDIS_REST_URL:-}"
+TOKEN="${UPSTASH_REDIS_REST_TOKEN:-}"
+
+if [[ -z "$BASE" || -z "$TOKEN" ]]; then
+  echo "ERROR: Missing UPSTASH_REDIS_REST_URL or UPSTASH_REDIS_REST_TOKEN" >&2
+  exit 1
+fi
+
+cmd=${1:-}
+key=${2:-}
+val=${3:-}
+
+if [[ "$cmd" == "get" && -n "$key" ]]; then
+  curl -sS -H "Authorization: Bearer $TOKEN" "${BASE%/}/get/$(python3 -c "import urllib.parse,sys;print(urllib.parse.quote(sys.argv[1]))" "$key")"
+  exit 0
+fi
+
+if [[ "$cmd" == "set" && -n "$key" && -n "$val" ]]; then
+  curl -sS -X POST -H "Authorization: Bearer $TOKEN" "${BASE%/}/set/$(python3 -c "import urllib.parse,sys;print(urllib.parse.quote(sys.argv[1]))" "$key")/$(python3 -c "import urllib.parse,sys;print(urllib.parse.quote(sys.argv[1]))" "$val")"
+  exit 0
+fi
+
+cat <<USAGE
+Usage:
+  scripts/upstash get <key>
+  scripts/upstash set <key> <value>
+Env:
+  UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN
+USAGE
+exit 1
+

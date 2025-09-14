@@ -2,8 +2,8 @@ import "reflect-metadata";
 import { NestFactory } from "@nestjs/core";
 import { ValidationPipe } from "@nestjs/common";
 import { AppModule } from "./app.module";
-import { startOllamaProxyIfNeeded } from "./utils/ollama-proxy";
-import { verifyMcpJwt } from "./middleware/jwt";
+import { startOllamaProxyIfNeeded, getOllamaProxyStatus } from "./utils/ollama-proxy";
+import { publishHealthSnapshot, upstashEnabled } from "./utils/upstash";
 import { measureMcpLatency } from "./middleware/timing";
 
 async function bootstrap() {
@@ -27,7 +27,7 @@ async function bootstrap() {
   });
 
   // Apply middlewares to MCP routes
-  app.use("/api/mcp", measureMcpLatency, verifyMcpJwt);
+  app.use("/api/mcp", measureMcpLatency);
 
   // Enable global validation
   app.useGlobalPipes(
@@ -47,6 +47,48 @@ async function bootstrap() {
   console.log(
     `NestJS application is running on: http://${urlHost}:${port} (bind ${host})`,
   );
+
+  // Publish health snapshot to Upstash if configured
+  try {
+    if (upstashEnabled()) {
+      const makeHealth = () => ({
+        status: "ok",
+        port: String(port),
+        host,
+        env: {
+          MCP_USE_FIXTURES: process.env.MCP_USE_FIXTURES || "",
+          JIRA_BASE_URL: process.env.JIRA_BASE_URL ? "set" : "",
+          OPENAI_BASE_URL: process.env.OPENAI_BASE_URL || "",
+          MODEL_NAME: process.env.MODEL_NAME || "",
+          JIRA_BOARD_ID: process.env.JIRA_BOARD_ID || "",
+          JIRA_PROJECT_KEY: process.env.JIRA_PROJECT_KEY || "",
+        },
+        ollamaProxy: getOllamaProxyStatus(),
+        time: new Date().toISOString(),
+      });
+      const key = process.env.UPSTASH_HEALTH_KEY || "healthz:last";
+      const ok = await publishHealthSnapshot(key, makeHealth());
+      console.log(`[Upstash] published health snapshot to key='${key}': ${ok}`);
+
+      // Periodic publishing if interval set (default 60s)
+      const intervalSec = Number(process.env.UPSTASH_HEALTH_INTERVAL_SEC || 60);
+      if (intervalSec > 0) {
+        setInterval(async () => {
+          try {
+            const ok2 = await publishHealthSnapshot(key, makeHealth());
+            if (!ok2) console.warn("[Upstash] periodic publish returned false");
+          } catch (e) {
+            console.warn("[Upstash] periodic publish failed:", (e as any)?.message || e);
+          }
+        }, intervalSec * 1000).unref?.();
+        console.log(`[Upstash] periodic publishing every ${intervalSec}s to key='${key}'`);
+      }
+    } else {
+      console.log("[Upstash] disabled (missing env)");
+    }
+  } catch (e) {
+    console.warn("[Upstash] publish skipped:", (e as any)?.message || e);
+  }
 }
 
 bootstrap();

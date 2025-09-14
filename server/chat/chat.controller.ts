@@ -19,6 +19,7 @@ import type {
 } from "./dto/persistent-chat.dto";
 import { streamText } from "ai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
+import { getEffectiveOllamaBaseUrl } from "../utils/ollama-proxy";
 import axios from "axios";
 import { z } from "zod";
 
@@ -41,7 +42,7 @@ export class ChatController {
 
       // Local provider for streaming (avoids DI edge cases)
       const ollama = createOpenAICompatible({
-        baseURL: process.env.OPENAI_BASE_URL || "http://127.0.0.1:11434/v1",
+        baseURL: getEffectiveOllamaBaseUrl(),
         name: "ollama",
         apiKey: process.env.OPENAI_API_KEY || "ollama",
       });
@@ -150,7 +151,7 @@ export class ChatController {
       }
       // Use AI SDK directly (mirrors ChatService.getResponse but avoids DI issues)
       const ollama = createOpenAICompatible({
-        baseURL: process.env.OPENAI_BASE_URL || "http://127.0.0.1:11434/v1",
+        baseURL: getEffectiveOllamaBaseUrl(),
         name: "ollama",
         apiKey: process.env.OPENAI_API_KEY || "ollama",
       });

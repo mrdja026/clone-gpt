@@ -1,6 +1,7 @@
 import { Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { streamText } from "ai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
+import { getEffectiveOllamaBaseUrl } from "../utils/ollama-proxy";
 import { ChatRequestDto, ChatResponseDto } from "./dto/chat.dto";
 import { ChatsService } from "../services/chats.service";
 import { MessagesService } from "../services/messages.service";
@@ -10,7 +11,7 @@ import { McpService } from "../mcp/mcp.service";
 
 // Configure provider for Ollama's OpenAI-compatible endpoint
 const ollama = createOpenAICompatible({
-  baseURL: process.env.OPENAI_BASE_URL || "http://127.0.0.1:11434/v1",
+  baseURL: getEffectiveOllamaBaseUrl(),
   name: "ollama",
   apiKey: process.env.OPENAI_API_KEY || "ollama",
 });

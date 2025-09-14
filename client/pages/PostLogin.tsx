@@ -290,6 +290,9 @@ export default function PostLogin() {
           <>
             <AboutDialog trigger={<Button variant="ghost" size="sm">About</Button>} />
             <ProvidersMenu />
+            <Button variant="ghost" size="sm" asChild>
+              <Link to="/diagnostics">Diagnostics</Link>
+            </Button>
             <Button variant="ghost" size="sm" onClick={() => navigate("/chat")}>Open Full Chat</Button>
             <ThemeToggle />
           </>

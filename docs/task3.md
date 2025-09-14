@@ -102,13 +102,12 @@ project-root/
 ## 📐 Decisions (Updated)
 
 - Proxy MCP under existing server in production for a single origin (easiest path). UI calls `/api/mcp/*` and server proxies to MCP HTTP or spawns STDIO in dev as fallback.
-- First auth mechanism: JWT via `MCP_JWT_SECRET`. When unset, auth is bypassed for local dev.
+- JWT is not used; MCP endpoints are open in dev.
 - Latency/SLO target: tool calls should complete in < 60 seconds. Requests exceeding 60s are flagged in logs for follow-up.
 
-## 🔐 JWT Usage
+## 🔐 Auth
 
-- Configure `MCP_JWT_SECRET` in the server environment to enforce Authorization: `Bearer <token>` on `/api/mcp/*` routes.
-- If not set, the middleware bypasses auth to keep local dev simple.
+No JWT layer is used for MCP in this app.
 
 ## 🔎 Observability & SLO
 
@@ -120,8 +119,7 @@ project-root/
 List tools:
 
 ```bash
-curl -s -X GET http://localhost:8080/api/mcp/tools \
-  -H "Authorization: Bearer $MCP_JWT" | jq .
+curl -s -X GET http://localhost:8080/api/mcp/tools | jq .
 ```
 
 Call a tool:
@@ -129,7 +127,6 @@ Call a tool:
 ```bash
 curl -s -X POST http://localhost:8080/api/mcp/tool \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $MCP_JWT" \
   -d '{"name":"jira_whoami","arguments":{}}' | jq .
 ```
 
@@ -138,8 +135,7 @@ Read a resource:
 ```bash
 curl -s -X POST http://localhost:8080/api/mcp/resource \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $MCP_JWT" \
   -d '{"uri":"mcp://local-mcp-server/jira/projects"}' | jq .
 ```
 
-Note: During local dev without `MCP_JWT_SECRET`, you can omit the Authorization header.
+Note: Authorization header is not required.

@@ -252,9 +252,8 @@ Known pitfalls:
 - Default: direct Jira adapter (no external MCP).
 - No stdio is used.
 
-### Avoiding 401/404
+### Avoiding 404
 
-- 401 on `/api/mcp/*` happens only if `MCP_JWT_SECRET` is set. In dev, leave it unset, or include `Authorization: Bearer <token>`.
 - 404 happens if the path/method is wrong. Valid endpoints:
   - `GET /api/mcp/tools`
   - `POST /api/mcp/tool` (body: `{ name, arguments }`)
@@ -282,19 +281,7 @@ curl -s -X POST http://localhost:8080/api/mcp/resource \
   -d '{"uri":"mcp://local-mcp-server/jira/projects"}'
 ```
 
-If you enable route protection during dev:
-
-```
-# In .env
-MCP_JWT_SECRET=dev-secret
-
-# Generate a token (example)
-node -e "import('jsonwebtoken').then(m=>console.log(m.default.sign({sub:'dev'}, 'dev-secret',{expiresIn:'2h'})))"
-
-# Use it
-export MCP_JWT=<paste_token>
-curl -i http://localhost:8080/api/mcp/tools -H "Authorization: Bearer $MCP_JWT"
-```
+// JWT is not used for MCP in this app; no route protection or Authorization header is required.
 
 ### Acceptance criteria mapping
 
@@ -336,3 +323,7 @@ I can use this to **store, fetch, and clean up test data** directly in my Codex 
 Session logged at: 2025-09-14T18:13:25.357Z
 
 Session logged at: 2025-09-14T18:17:47.307Z
+
+Session logged at: 2025-09-14T20:28:25.684Z
+
+Session logged at: 2025-09-14T20:28:29.971Z

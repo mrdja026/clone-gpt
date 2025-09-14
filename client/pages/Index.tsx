@@ -476,6 +476,7 @@ export default function Index() {
           <>
             <Link to="/" className="text-sm text-muted-foreground hover:text-foreground">Home</Link>
             <Link to="/about" className="text-sm text-muted-foreground hover:text-foreground">About</Link>
+            <Link to="/diagnostics" className="text-sm text-muted-foreground hover:text-foreground">Diagnostics</Link>
             <ProvidersMenu />
             <ThemeToggle />
           </>
