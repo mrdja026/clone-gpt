@@ -19,23 +19,8 @@ export class MCPClient {
   private serverProcess: any = null;
   private isInitialized = false;
 
-  private getAuthHeaders(): Record<string, string> {
-    try {
-      // Prefer runtime-provided JWT first (e.g. from a login flow)
-      const stored =
-        typeof window !== "undefined"
-          ? window.localStorage.getItem("mcp_jwt")
-          : null;
-      // Allow static token via Vite env for local dev
-      const envToken = (import.meta as any)?.env?.VITE_MCP_JWT as
-        | string
-        | undefined;
-      const token = stored || envToken;
-      return token ? { Authorization: `Bearer ${token}` } : {};
-    } catch {
-      return {};
-    }
-  }
+  // No auth headers required for MCP endpoints in this app
+  private getAuthHeaders(): Record<string, string> { return {}; }
 
   /**
    * Initialize connection to the MCP server

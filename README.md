@@ -402,6 +402,29 @@ PORT=3000
 
 This application integrates with MCP to enhance JIRA workflow automation. The system detects deterministic queries and executes MCP tool/resource calls to fetch data. No external MCP repo is required; the server provides built‑in adapters and supports fixtures. The legacy `hello_world_mcp` example has been removed as part of repo cleanup.
 
+### Upstash Health Snapshots
+
+The server can publish a health snapshot to Upstash Redis so you can inspect environment and proxy status remotely.
+
+- Configure `.env`:
+
+```
+UPSTASH_REDIS_REST_URL=https://<your-upstash-endpoint>
+UPSTASH_REDIS_REST_TOKEN=<your-upstash-rest-token>
+# Optional overrides
+UPSTASH_HEALTH_KEY=healthz:last
+UPSTASH_HEALTH_INTERVAL_SEC=60
+```
+
+- Behavior:
+  - On startup, a snapshot is written to `UPSTASH_HEALTH_KEY` (default `healthz:last`).
+  - If `UPSTASH_HEALTH_INTERVAL_SEC` > 0, it continues to publish every N seconds.
+  - Snapshot includes: `status`, `port`, `host`, `env` summary, `ollamaProxy` status, and `time`.
+
+- CLI helper:
+  - `scripts/upstash get healthz:last`
+  - `scripts/upstash set some:key someValue`
+
 ## Supported Deterministic Queries
 
 The system automatically handles these query patterns:
@@ -798,8 +821,7 @@ The core MCP integration is functional - the stdio communication, query matching
 ### What we changed
 
 - Consolidated on NestJS for the API surface and removed the legacy Express wiring from Vite.
-- Added middlewares to NestJS MCP routes:
-  - `verifyMcpJwt` (JWT optional in dev, enforced when `MCP_JWT_SECRET` is set)
+- Added middleware to NestJS MCP routes:
   - `measureMcpLatency` (adds timing logs; soft SLO < 60s)
 - Updated `McpService`:
   - Primary path: JSON‑RPC over HTTP to MCP endpoint if configured
@@ -810,7 +832,7 @@ The core MCP integration is functional - the stdio communication, query matching
 ### Cost (trade‑offs and effort)
 
 - Engineering effort: ~1–2 days of refactor + debugging (DI, ESM pathing, dev scripts, proxy, JWT)
-- Added dependencies: `jsonwebtoken` and its types
+- Removed JWT-based guarding. No auth is used for MCP routes in this app.
 - Operational trade‑off: separate MCP HTTP service is optional; when used, must run on a port different from Nest; otherwise STDIO fallback is used in dev
 - Benefit: clear API boundary, better observability, JWT guard path to production, no Express-in-Vite coupling
 
@@ -828,13 +850,6 @@ pnpm exec vite
 ```
 
 Vite proxies `/api/*` → `http://localhost:3001/*`.
-
-### Optional auth (JWT)
-
-```powershell
-$env:MCP_JWT_SECRET = "dev-secret"
-$env:MCP_JWT = node -e "console.log(require('jsonwebtoken').sign({ sub:'dev-user' }, process.env.MCP_JWT_SECRET, { expiresIn:'1h' }))"
-```
 
 ### Optional HTTP MCP
 
@@ -856,22 +871,17 @@ Invoke-RestMethod -Uri "http://localhost:8080/api/ping"
 List MCP tools (through Nest)
 
 ```powershell
-# Without JWT
 Invoke-RestMethod -Uri "http://localhost:3001/api/mcp/tools"
 
-# With JWT
-$hdr = @{ Authorization = "Bearer $env:MCP_JWT" }
-Invoke-RestMethod -Uri "http://localhost:3001/api/mcp/tools" -Headers $hdr
-
 # Via Vite proxy
-Invoke-RestMethod -Uri "http://localhost:8080/api/mcp/tools" -Headers $hdr
+Invoke-RestMethod -Uri "http://localhost:8080/api/mcp/tools"
 ```
 
 Call a tool
 
 ```powershell
 $body = @{ name = "jira_whoami"; arguments = @{} } | ConvertTo-Json -Compress
-Invoke-RestMethod -Uri "http://localhost:3001/api/mcp/tool" -Method Post -ContentType "application/json" -Headers $hdr -Body $body
+Invoke-RestMethod -Uri "http://localhost:3001/api/mcp/tool" -Method Post -ContentType "application/json" -Body $body
 ```
 
 Read a resource

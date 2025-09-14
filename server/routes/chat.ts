@@ -1,12 +1,12 @@
 import { RequestHandler } from "express";
 import { streamText } from "ai";
 import { createOllama } from "ollama-ai-provider-v2";
+import { getEffectiveOllamaBaseUrl } from "../utils/ollama-proxy";
 
 // Configure Ollama provider (local OpenAI-compatible server)
-const rawBaseUrl =
-  process.env.OLLAMA_BASE_URL ||
-  process.env.OPENAI_BASE_URL ||
-  "http://127.0.0.1:11434/api/v1";
+const effectiveV1 = getEffectiveOllamaBaseUrl();
+// Map /v1 base to /api base expected by ollama provider
+const rawBaseUrl = (process.env.OLLAMA_BASE_URL || effectiveV1).replace(/\/v1$/, "/api");
 
 // Normalize: remove trailing /v1 if present, and ensure /api suffix exists
 const normalizedBaseUrl = (() => {

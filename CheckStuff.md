@@ -9,7 +9,6 @@ Purpose
 
 Scenarios covered
 - Vite port change (8080 → 8081) and direct Nest (3001).
-- Auth off (dev default) vs. JWT‑protected `/api/mcp/*`.
 - Jira basic auth present vs. missing (tools list works without, Jira calls don’t).
 - External MCP path exists vs. missing; Repo B dependencies installed vs. not.
 
@@ -26,7 +25,6 @@ Why these steps
 - Start servers the same way you develop (`pnpm dev`) to reflect real behavior.
 - Probe via Vite proxy first (SPA path), then Nest directly to isolate proxy issues.
 - If `/api/mcp/*` fails, print the new `[MCP]` logs (spawn path, cwd, error) added in `server/mcp/mcp.service.ts`.
-- If `MCP_JWT_SECRET` is set, mint a dev JWT automatically to avoid 401s.
 
 How to run
 - Copy the script below into a file (e.g., `scripts/check-mcp.sh`) and run:
@@ -112,33 +110,23 @@ if curl -s http://localhost:8080/api/ping >/dev/null 2>&1; then V_PORT=8080; ech
 elif curl -s http://localhost:8081/api/ping >/dev/null 2>&1; then V_PORT=8081; echo " ${V_PORT}";
 else echo " none (will use direct Nest only)"; fi
 
-echo "[5/8] Preparing Authorization header if MCP routes are protected…";
-if [[ -n "${MCP_JWT_SECRET:-}" ]]; then
-  echo "- MCP_JWT_SECRET is set. Generating JWT for tests…"
-  # Try to mint a JWT via node + jsonwebtoken
-  if TOKEN=$(node -e "import('jsonwebtoken').then(m=>console.log(m.default.sign({sub:'dev'}, process.env.MCP_JWT_SECRET,{expiresIn:'2h'})))" 2>/dev/null); then
-    JWT_HEADER=( -H "Authorization: Bearer ${TOKEN}" )
-    echo "- JWT generated."
-  else
-    echo "WARN: Failed to generate JWT automatically. Tests may 401."
-  fi
-fi
+echo "[5/8] No JWT protection used for MCP routes in this app."
 
 echo "[6/8] Proxy checks via Vite (if available)…";
 if [[ "$V_PORT" != "none" ]]; then
   echo "- Ping:";     curl -sS -i "http://localhost:${V_PORT}/api/ping" | sed -n '1,8p'
-  echo "- Tools:";    curl -sS -i "http://localhost:${V_PORT}/api/mcp/tools"  "${JWT_HEADER[@]:-}" | sed -n '1,12p'
-  echo "- Ticket:";   curl -sS    "http://localhost:${V_PORT}/api/mcp/tool"   -H 'Content-Type: application/json' "${JWT_HEADER[@]:-}" -d '{"name":"fetch_jira_ticket","arguments":{"ticketKey":"SCRUM-8"}}' | sed -n '1,80p'
-  echo "- Projects:"; curl -sS    "http://localhost:${V_PORT}/api/mcp/resource" -H 'Content-Type: application/json' "${JWT_HEADER[@]:-}" -d '{"uri":"mcp://local-mcp-server/jira/projects"}' | sed -n '1,80p'
+  echo "- Tools:";    curl -sS -i "http://localhost:${V_PORT}/api/mcp/tools"   | sed -n '1,12p'
+  echo "- Ticket:";   curl -sS    "http://localhost:${V_PORT}/api/mcp/tool"    -H 'Content-Type: application/json' -d '{"name":"fetch_jira_ticket","arguments":{"ticketKey":"SCRUM-8"}}' | sed -n '1,80p'
+  echo "- Projects:"; curl -sS    "http://localhost:${V_PORT}/api/mcp/resource" -H 'Content-Type: application/json' -d '{"uri":"mcp://local-mcp-server/jira/projects"}' | sed -n '1,80p'
 else
   echo "- Skipping proxy checks (no Vite port detected)"
 fi
 
 echo "[7/8] Direct checks to Nest (bypass Vite)…";
 echo "- Ping:";     curl -sS -i http://localhost:3001/api/ping | sed -n '1,8p'
-echo "- Tools:";    curl -sS -i http://localhost:3001/api/mcp/tools  "${JWT_HEADER[@]:-}" | sed -n '1,12p'
-echo "- Ticket:";   curl -sS    http://localhost:3001/api/mcp/tool   -H 'Content-Type: application/json' "${JWT_HEADER[@]:-}" -d '{"name":"fetch_jira_ticket","arguments":{"ticketKey":"SCRUM-8"}}' | sed -n '1,80p'
-echo "- Projects:"; curl -sS    http://localhost:3001/api/mcp/resource -H 'Content-Type: application/json' "${JWT_HEADER[@]:-}" -d '{"uri":"mcp://local-mcp-server/jira/projects"}' | sed -n '1,80p'
+echo "- Tools:";    curl -sS -i http://localhost:3001/api/mcp/tools   | sed -n '1,12p'
+echo "- Ticket:";   curl -sS    http://localhost:3001/api/mcp/tool    -H 'Content-Type: application/json' -d '{"name":"fetch_jira_ticket","arguments":{"ticketKey":"SCRUM-8"}}' | sed -n '1,80p'
+echo "- Projects:"; curl -sS    http://localhost:3001/api/mcp/resource -H 'Content-Type: application/json' -d '{"uri":"mcp://local-mcp-server/jira/projects"}' | sed -n '1,80p'
 
 echo "[8/8] Troubleshooting hints…"
 if grep -q "\"statusCode\":500" "${LOG_FILE}" 2>/dev/null || true; then
@@ -154,10 +142,7 @@ Expected outcomes
   - `ping` returns 200
   - `mcp/tools` returns 200 with tools (e.g., `process_text`, `fetch_jira_ticket`)
   - Ticket and projects calls return JSON payloads from Jira
-- With `MCP_JWT_SECRET` set: same as above, with Authorization header added
-
 If things fail
-- 401 on `/api/mcp/*`: you set `MCP_JWT_SECRET` but didn’t send `Authorization: Bearer <token>`.
 - 404: wrong route/method (valid: `GET /api/mcp/tools`, `POST /api/mcp/tool`, `POST /api/mcp/resource`).
 - 500: server‑side MCP error — check printed `[MCP]` lines:
   - `serverExists: false` → fix `MCP_SERVER_PATH` to the real MCP entry file
@@ -167,4 +152,3 @@ If things fail
 Notes
 - Vite may occupy 8080 already; the script auto‑detects 8080 or 8081.
 - You can rerun the script anytime after changing `.env` to confirm the entire path.
-

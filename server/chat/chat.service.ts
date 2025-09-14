@@ -1,12 +1,13 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { streamText } from "ai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
+import { getEffectiveOllamaBaseUrl } from "../utils/ollama-proxy";
 
 import { ChatRequestDto, ChatResponseDto } from "./dto/chat.dto";
 
 // Configure provider for Ollama's OpenAI-compatible endpoint
 const ollama = createOpenAICompatible({
-  baseURL: process.env.OPENAI_BASE_URL || "http://127.0.0.1:11434/v1",
+  baseURL: getEffectiveOllamaBaseUrl(),
   name: "ollama",
   apiKey: process.env.OPENAI_API_KEY || "ollama",
 });

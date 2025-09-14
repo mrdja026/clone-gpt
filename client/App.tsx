@@ -12,6 +12,7 @@ import NotFound from "./pages/NotFound";
 import About from "./pages/About";
 import ProviderPerplexity from "./pages/ProviderPerplexity";
 import ProviderNotion from "./pages/ProviderNotion";
+import Diagnostics from "./pages/Diagnostics";
 
 const queryClient = new QueryClient();
 
@@ -25,6 +26,7 @@ const App = () => (
           <Route path="/" element={<PostLogin />} />
           <Route path="/chat" element={<Index />} />
           <Route path="/about" element={<About />} />
+          <Route path="/diagnostics" element={<Diagnostics />} />
           <Route path="/providers/perplexity" element={<ProviderPerplexity />} />
           <Route path="/providers/notion" element={<ProviderNotion />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

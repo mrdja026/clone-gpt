@@ -15,7 +15,7 @@ Goal: Identify and fix 401/405 errors when using MCP endpoints, verify fixture-b
   - `MCP_USE_FIXTURES` value.
 - External MCP is optional. Prefer direct Jira adapter or fixtures. If you run an HTTP MCP, set `MCP_BASE_URL`.
   - Jira env presence flags: `JIRA_BASE_URL`, `JIRA_EMAIL`, `JIRA_API_TOKEN`.
-- If you enabled route protection earlier, ensure `MCP_JWT_SECRET` is unset in dev; otherwise include a valid `Authorization: Bearer <token>` per README. - DO NOT TEST OR USE THIS OUT OF SCOPE
+// JWT is not used for MCP; no Authorization header is needed.
 
 ### 2) Reproduce with fixtures (expected to pass)
 
@@ -38,7 +38,7 @@ Goal: Identify and fix 401/405 errors when using MCP endpoints, verify fixture-b
 
 ### 4) If 401 occurs
 
-- For Nest endpoints: check whether `MCP_JWT_SECRET` is set; in dev, leave it unset. If set, attach `Authorization: Bearer $MCP_JWT` as documented in README.
+// No JWT layer is present; endpoints are open in dev.
 - For Jira (when fixtures off): 401 means missing/invalid Basic auth. Ensure:
   - `JIRA_BASE_URL=https://your-domain.atlassian.net`
   - `JIRA_EMAIL=you@domain.tld`
@@ -63,7 +63,7 @@ Goal: Identify and fix 401/405 errors when using MCP endpoints, verify fixture-b
 
 - Fixture mode: cURL calls succeed, and UI renders “JIRA Ticket: SCRUM-8 …” (e2e passes).
 - Real Jira mode: cURL to `/api/mcp/tool` with `fetch_jira_ticket` returns real issue data (no 401/405) with valid credentials.
-- No 401s on `/api/mcp/*` in dev unless `MCP_JWT_SECRET` is intentionally set; no 405s due to method/path mismatch.
+- No 401s expected on `/api/mcp/*` in dev; ensure method/path is correct to avoid 404/405.
 
 ### Notes
 
