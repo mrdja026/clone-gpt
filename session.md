@@ -7,9 +7,10 @@ Key files: src/server.ts, src/routes/chat.ts
 # MCP Modes
 
 This app runs MCP in three modes without any external repository:
-1) Direct Jira adapter (default)
-2) Fixtures (`MCP_USE_FIXTURES=1`)
-3) External HTTP MCP via `MCP_BASE_URL` (optional)
+
+1. Direct Jira adapter (default)
+2. Fixtures (`MCP_USE_FIXTURES=1`)
+3. External HTTP MCP via `MCP_BASE_URL` (optional)
 
 # Guidelines: general mdc
 
@@ -47,9 +48,9 @@ Suggest edits, commands, or code. Use @Readme.md files and general.mdc Guideline
 
 - Status
   - MCP can run in three modes (no code changes):
-    1) Direct Jira adapter (default)
-    2) Fixtures (`MCP_USE_FIXTURES=1`)
-    3) External HTTP MCP via `MCP_BASE_URL`
+    1. Direct Jira adapter (default)
+    2. Fixtures (`MCP_USE_FIXTURES=1`)
+    3. External HTTP MCP via `MCP_BASE_URL`
   - Jira credentials are read from `.env`.
 
 - TODO (execute and verify)
@@ -321,12 +322,14 @@ Session logged at: 2025-09-13T19:13:05.112Z
   - `scripts/open-on-ready.sh` — waits on the app URL, opens the browser, and pings the alert endpoint.
   - `package.json` — `dev:fixtures:open` runs app + opener concurrently.
 
-Session logged at: 2025-09-13T22:48:45.867Z
+### Upstash Redis Helper
 
-Session logged at: 2025-09-14T06:44:16.447Z
+I have a script (`scripts/upstash`) to interact with my Upstash Redis database.
 
-Session logged at: 2025-09-14T08:19:27.206Z
+- `./scripts/upstash set test-key "hello"`
+- `./scripts/upstash get test-key`
+- `./scripts/upstash del test-key`
 
-Session logged at: 2025-09-14T10:58:50.277Z
+I can use this to **store, fetch, and clean up test data** directly in my Codex sessions (via `functions.shell`).
 
-Session logged at: 2025-09-14T12:34:17.547Z
+Session logged at: 2025-09-14T18:13:25.357Z
