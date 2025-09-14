@@ -7,6 +7,7 @@ export type OllamaProxyStatus = {
   checkedModel: string;
   targetHost?: string | null;
   note?: string | null;
+  port?: number | null;
 };
 
 async function fetchJson(url: string, timeoutMs = 1500): Promise<any | null> {
@@ -51,6 +52,7 @@ let lastStatus: OllamaProxyStatus = {
   checkedModel: process.env.MODEL_NAME || "",
   targetHost: null,
   note: "not-initialized",
+  port: null,
 };
 
 export function getOllamaProxyStatus(): OllamaProxyStatus {
@@ -58,19 +60,28 @@ export function getOllamaProxyStatus(): OllamaProxyStatus {
 }
 
 export function getEffectiveOllamaBaseUrl(): string {
-  const envBase = process.env.OPENAI_BASE_URL || "http://127.0.0.1:11434/v1";
-  // If the proxy is active, keep using 127.0.0.1 base
-  if (lastStatus.active) return envBase;
-  // If port binding failed due to EADDRINUSE or base was localhost, try direct Windows host IP
-  const note = lastStatus.note || "";
-  const winIp = process.env.WINDOWS_OLLAMA_HOST_IP || "";
-  const ipOnly = winIp.replace(/^https?:\/\//, "").replace(/:\d+.*$/, "");
-  if (
-    ipOnly &&
-    (/port-in-use-skip/.test(note) || /base-url-not-127\.0\.0\.1:11434/.test(note) || /missing/i.test(note))
-  ) {
-    return `http://${ipOnly}:11434/v1`;
+  const defaultLocal = "http://127.0.0.1:11434/v1";
+  const envBase = process.env.OPENAI_BASE_URL || defaultLocal;
+
+  // If proxy is active and a port was bound, prefer the local proxy with that port
+  if (lastStatus.active && lastStatus.port) {
+    return `http://127.0.0.1:${lastStatus.port}/v1`;
   }
+
+  // If proxy did not activate (e.g., ports busy or base not local), prefer direct Windows IP if provided
+  const winIp = (process.env.WINDOWS_OLLAMA_HOST_IP || "")
+    .replace(/^https?:\/\//, "")
+    .replace(/:\d+.*$/, "");
+
+  if (winIp) {
+    // When env base points to 127.0.0.1 but we couldn't bind a proxy, route directly to Windows IP.
+    const baseIsLocal127 = /^http:\/\/127\.0\.0\.1(?::\d+)?\//.test(envBase);
+    if (!lastStatus.active && baseIsLocal127) {
+      return `http://${winIp}:11434/v1`;
+    }
+  }
+
+  // Fallback to configured base URL (env or default local)
   return envBase;
 }
 
@@ -78,9 +89,16 @@ export async function startOllamaProxyIfNeeded() {
   if (started) return;
   const baseUrl = process.env.OPENAI_BASE_URL || "";
   const modelName = process.env.MODEL_NAME || "branko:latest";
-  lastStatus = { active: false, baseUrl, checkedModel: modelName, targetHost: null, note: null };
+  lastStatus = {
+    active: false,
+    baseUrl,
+    checkedModel: modelName,
+    targetHost: null,
+    note: null,
+    port: null,
+  };
   // Only manage when targeting local 127.0.0.1:11434
-  if (!/^http:\/\/127\.0\.0\.1:11434\//.test(baseUrl)) {
+  if (!/^http:\/\/127\.0\.0\.1(?::11434)?\//.test(baseUrl)) {
     lastStatus.note = "base-url-not-127.0.0.1:11434";
     return;
   }
@@ -102,48 +120,58 @@ export async function startOllamaProxyIfNeeded() {
   }
   lastStatus.targetHost = targetHost;
 
-  // Try to bind proxy on 127.0.0.1:11434 → Windows host
-  await new Promise<void>((resolve) => {
-    const server = http.createServer((req, res) => {
-      const options = {
-        hostname: targetHost,
-        port: 11434,
-        method: req.method,
-        path: req.url,
-        headers: req.headers,
-      } as http.RequestOptions;
+  // Try to bind proxy on 127.0.0.1 starting at START_PORT → Windows host
+  const startPort = Number(process.env.OLLAMA_PROXY_START_PORT || 11434);
+  const tries = Math.max(1, Number(process.env.OLLAMA_PROXY_PORT_TRIES || 7));
 
-      const upstream = http.request(options, (upRes) => {
-        res.writeHead(upRes.statusCode || 502, upRes.headers as any);
-        upRes.pipe(res);
+  for (let i = 0; i < tries; i++) {
+    const port = startPort + i;
+    const ok = await new Promise<boolean>((resolve) => {
+      const server = http.createServer((req, res) => {
+        const options = {
+          hostname: targetHost,
+          port: 11434,
+          method: req.method,
+          path: req.url,
+          headers: req.headers,
+        } as http.RequestOptions;
+
+        const upstream = http.request(options, (upRes) => {
+          res.writeHead(upRes.statusCode || 502, upRes.headers as any);
+          upRes.pipe(res);
+        });
+        upstream.on("error", (err) => {
+          if (!res.headersSent) res.writeHead(502, { "content-type": "application/json" });
+          res.end(JSON.stringify({ error: "Bad Gateway", message: err.message }));
+        });
+        req.pipe(upstream);
       });
-      upstream.on("error", (err) => {
-        if (!res.headersSent) res.writeHead(502, { "content-type": "application/json" });
-        res.end(JSON.stringify({ error: "Bad Gateway", message: err.message }));
+
+      server.on("error", (err: any) => {
+        if (err?.code === "EADDRINUSE") {
+          // Port is in use; try next
+          resolve(false);
+        } else {
+          // Unexpected error; log and try next port as well
+          console.warn(`[OllamaProxy] FAILED to start on :${port}:`, err?.message || err);
+          resolve(false);
+        }
       });
-      req.pipe(upstream);
-    });
 
-    server.on("error", (err: any) => {
-      // If port already in use, assume either Ollama or another proxy is running
-      if (err?.code === "EADDRINUSE") {
-        lastStatus.note = "port-in-use-skip";
-        console.warn("[OllamaProxy] SKIP: 127.0.0.1:11434 already in use.");
-      } else {
-        lastStatus.note = `start-failed:${err?.message || err}`;
-        console.warn("[OllamaProxy] FAILED to start:", err?.message || err);
-      }
-      resolve();
+      server.listen(port, "127.0.0.1", () => {
+        started = true;
+        lastStatus.active = true;
+        lastStatus.note = i === 0 ? "activated" : `activated-alt-port:${port}`;
+        lastStatus.port = port;
+        console.log(
+          `[OllamaProxy] ACTIVATED: 127.0.0.1:${port} -> ${targetHost}:11434 (missing '${modelName}' locally)`,
+        );
+        resolve(true);
+      });
     });
+    if (ok) return; // bound successfully
+  }
 
-    server.listen(11434, "127.0.0.1", () => {
-      started = true;
-      lastStatus.active = true;
-      lastStatus.note = "activated";
-      console.log(
-        `[OllamaProxy] ACTIVATED: 127.0.0.1:11434 -> ${targetHost}:11434 (missing '${modelName}' locally)`,
-      );
-      resolve();
-    });
-  });
+  // If we reach here, we failed to bind any port in the range
+  lastStatus.note = `port-range-unavailable:${startPort}..${startPort + tries - 1}`;
 }

@@ -1,6 +1,6 @@
 import { Controller, Get } from "@nestjs/common";
 import type { DemoResponse } from "../../shared/api";
-import { getOllamaProxyStatus } from "../utils/ollama-proxy";
+import { getOllamaProxyStatus, getEffectiveOllamaBaseUrl } from "../utils/ollama-proxy";
 
 @Controller()
 export class DemoController {
@@ -34,6 +34,7 @@ export class DemoController {
         JIRA_BOARD_ID: process.env.JIRA_BOARD_ID || "",
         JIRA_PROJECT_KEY: process.env.JIRA_PROJECT_KEY || "",
       },
+      effectiveBaseUrl: getEffectiveOllamaBaseUrl(),
       ollamaProxy: getOllamaProxyStatus(),
       time: new Date().toISOString(),
     };

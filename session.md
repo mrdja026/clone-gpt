@@ -202,7 +202,7 @@ Links
 
 ## Follow‑Up — WSL2 Ollama Bridging and Proxy
 
-Goal: Keep `OPENAI_BASE_URL=http://127.0.0.1:11434/v1` in WSL while using Windows Ollama hosting `branko:latest`.
+Goal: Keep `OPENAI_BASE_URL=http://127.0.0.1:11434/v1` in WSL while using Windows Ollama hosting `branko:latest`. When `:11434` is busy in WSL, auto‑pick the first free port in `11434..11440` and route via that local proxy.
 
 Steps:
 
@@ -210,9 +210,9 @@ Steps:
 - If possible, free WSL port 11434 so the proxy can bind: `ss -ltnp | grep ':11434'` → stop that process. If 11434 remains busy, the server will route to `http://<WINDOWS_OLLAMA_HOST_IP>:11434/v1` automatically.
 - On Windows, set `OLLAMA_HOST=0.0.0.0` and restart the Ollama service; allow TCP 11434 in the firewall.
 - Start app: `pnpm dev`.
-  - On startup, the server checks if `branko:latest` is present locally; if missing, it autostarts a tiny proxy that binds `127.0.0.1:11434` and forwards to the Windows host IP (from `/etc/resolv.conf` or `WINDOWS_OLLAMA_HOST_IP`).
-- Verify forwarding by listing models from WSL: `curl -s http://127.0.0.1:11434/v1/models | jq -r '.data[].id'` → must include `branko:latest`.
-- If forwarding doesn’t engage, check logs for `[OllamaProxy]`. When 11434 is busy, calls still work via the Windows IP fallback. See `docs/task6.md` for the planned auto‑port binding (11435+).
+  - On startup, the server checks if `branko:latest` is present locally; if missing, it autostarts a tiny proxy that binds `127.0.0.1:<PORT>` where `<PORT>` is the first free in `11434..11440` (configurable), forwarding to the Windows host IP (from `/etc/resolv.conf` or `WINDOWS_OLLAMA_HOST_IP`).
+- Verify forwarding by listing models from WSL: `curl -s http://127.0.0.1:<PORT>/v1/models | jq -r '.data[].id'` → must include `branko:latest`. Find `<PORT>` via `/api/healthz` → `ollamaProxy.port` or the `/diagnostics` page.
+- If forwarding doesn’t engage, check logs for `[OllamaProxy]`. When all ports are busy, calls still work via the Windows IP fallback. See `docs/task6.md`.
 
 Known pitfalls:
 
@@ -329,3 +329,5 @@ Session logged at: 2025-09-14T20:28:25.684Z
 Session logged at: 2025-09-14T20:28:29.971Z
 
 Session logged at: 2025-09-14T20:41:51.815Z
+
+Session logged at: 2025-09-14T22:31:40.879Z

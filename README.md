@@ -235,7 +235,17 @@ pnpm dev
 
 The server checks if your `MODEL_NAME` (e.g., `branko:latest`) exists at `127.0.0.1:11434` inside WSL. If not, it binds a tiny proxy on `127.0.0.1:11434` and forwards to the Windows host IP (detected from `/etc/resolv.conf` or `WINDOWS_OLLAMA_HOST_IP`).
 
-If `127.0.0.1:11434` is already in use in WSL, the proxy may be skipped; in that case, the server automatically routes to `http://<WINDOWS_OLLAMA_HOST_IP>:11434/v1` under the hood (no extra config). See `docs/task6.md` for the plan to auto‑pick an alternate local port (e.g., 11435) when 11434 is busy, and to surface the elected route via `/api/healthz` and `/diagnostics`.
+If `127.0.0.1:11434` is already in use in WSL, the server auto‑picks the first free port in a short range (default `11434..11440`) and binds a local forward proxy there. All LLM calls then use `http://127.0.0.1:<electedPort>/v1`. If no port in the range is free, it falls back to the Windows IP directly: `http://<WINDOWS_OLLAMA_HOST_IP>:11434/v1`.
+
+Quick verification:
+
+- `GET /api/healthz` returns `ollamaProxy.port` when the proxy is active and `effectiveBaseUrl` reflecting the URL actually used.
+- Open `/diagnostics` in the app to see the chosen route and port.
+
+Env switches:
+
+- `WINDOWS_OLLAMA_HOST_IP` — IP of the Windows host (no scheme/port)
+- `OLLAMA_PROXY_START_PORT` (default `11434`), `OLLAMA_PROXY_PORT_TRIES` (default `7`)
 
 ### Supported Models
 

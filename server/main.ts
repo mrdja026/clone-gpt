@@ -2,7 +2,7 @@ import "reflect-metadata";
 import { NestFactory } from "@nestjs/core";
 import { ValidationPipe } from "@nestjs/common";
 import { AppModule } from "./app.module";
-import { startOllamaProxyIfNeeded, getOllamaProxyStatus } from "./utils/ollama-proxy";
+import { startOllamaProxyIfNeeded, getOllamaProxyStatus, getEffectiveOllamaBaseUrl } from "./utils/ollama-proxy";
 import { publishHealthSnapshot, upstashEnabled } from "./utils/upstash";
 import { measureMcpLatency } from "./middleware/timing";
 
@@ -63,6 +63,7 @@ async function bootstrap() {
           JIRA_BOARD_ID: process.env.JIRA_BOARD_ID || "",
           JIRA_PROJECT_KEY: process.env.JIRA_PROJECT_KEY || "",
         },
+        effectiveBaseUrl: getEffectiveOllamaBaseUrl(),
         ollamaProxy: getOllamaProxyStatus(),
         time: new Date().toISOString(),
       });
