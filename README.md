@@ -41,9 +41,9 @@ OPENAI_API_KEY=your_openai_api_key_here
 **For Ollama (Local):**
 
 ```bash
-OPENAI_API_KEY=ollama
+OPENAI_BASE_URL=ollama
 OPENAI_BASE_URL=http://127.0.0.1:11434/v1
-MODEL_NAME=llama3.1:latest
+MODEL_NAME=branko:latest
 ```
 
 ### 2. Install Dependencies
@@ -65,6 +65,123 @@ The application will be available at `http://localhost:8080`
 - Run e2e (auto-starts dev with fixtures): `pnpm test:e2e`
 - Or run against an already started dev server: `pnpm dev:fixtures` then `pnpm test:e2e:noserver`
 - Specs live in `e2e/`, config in `playwright.config.ts`. Current suite is passing using fixtures.
+
+## MCP (Model Context Protocol) Integration
+
+MCP exposes tools and resources that the app calls for deterministic queries (e.g., Jira ticket lookups). This app supports three modes — all controlled by env vars (no code changes needed):
+
+- Direct Jira adapter (default)
+  - Leave `MCP_BASE_URL` unset and `MCP_USE_FIXTURES` empty/0.
+  - The server calls Jira directly from `server/mcp/mcp.service.ts` using `JIRA_BASE_URL`, `JIRA_EMAIL`, `JIRA_API_TOKEN`.
+  - Tools: `fetch_jira_ticket`, `fetch_jira_myself`. Resource: `mcp://local-mcp-server/jira/projects`.
+
+- External HTTP MCP (optional)
+  - Set `MCP_BASE_URL=http://localhost:<port>` to route all MCP calls to `${MCP_BASE_URL}/mcp` (JSON‑RPC over HTTP).
+  - No stdio is used.
+
+- Fixtures (dev/testing)
+  - Set `MCP_USE_FIXTURES=1` to return deterministic data from `server/fixtures/` (e.g., `SCRUM-8.json`).
+
+Quick verification (with `pnpm dev` running):
+
+- Health: `curl -s http://localhost:3001/api/healthz | jq`
+- Tools: `curl -s http://localhost:3001/api/mcp/tools | jq`
+- Ticket: `curl -s -X POST http://localhost:3001/api/mcp/tool -H 'content-type: application/json' -d '{"name":"fetch_jira_ticket","arguments":{"ticketKey":"SCRUM-8"}}' | jq`
+- Jira sanity: `curl -i http://localhost:3001/api/jira/myself`
+
+Run tests:
+
+- Fixtures (default): `pnpm test:e2e`
+- Real Jira: `REAL_JIRA=1 pnpm test:e2e` (auto‑starts dev with fixtures OFF)
+- Only Jira tests vs running dev: `PW_SKIP_WEBSERVER=1 BASE_URL=http://localhost:8080 pnpm playwright test e2e/jira-myself-route.spec.ts e2e/jira-myself.spec.ts`
+
+### External HTTP MCP example (optional)
+
+If you prefer to run an external MCP server, expose a simple HTTP JSON‑RPC endpoint at `/mcp` that accepts `{ jsonrpc, id, method, params }` and returns `{ jsonrpc, id, result }`. For example, a minimal Express server:
+
+```ts
+import express from "express";
+import bodyParser from "body-parser";
+
+const app = express();
+app.use(bodyParser.json());
+
+// Example tools/resources (replace with your own)
+const tools = [
+  {
+    name: "fetch_jira_ticket",
+    description: "Fetch a Jira ticket",
+    parameters: { ticketKey: { type: "string" } },
+  },
+  {
+    name: "fetch_jira_myself",
+    description: "Fetch current Jira user",
+    parameters: {},
+  },
+];
+
+app.post("/mcp", async (req, res) => {
+  const { method, params, id } = req.body || {};
+  try {
+    if (method === "listTools")
+      return res.json({ jsonrpc: "2.0", id, result: { tools } });
+    if (method === "callTool") {
+      const { name, arguments: args } = params || {};
+      if (name === "fetch_jira_ticket") {
+        return res.json({
+          jsonrpc: "2.0",
+          id,
+          result: {
+            content: [
+              { type: "text", text: JSON.stringify({ key: "DEMO-1" }) },
+            ],
+          },
+        });
+      }
+      if (name === "fetch_jira_myself") {
+        return res.json({
+          jsonrpc: "2.0",
+          id,
+          result: {
+            content: [
+              { type: "text", text: JSON.stringify({ accountId: "me" }) },
+            ],
+          },
+        });
+      }
+      return res
+        .status(400)
+        .json({
+          jsonrpc: "2.0",
+          id,
+          error: { code: -32601, message: `Unknown tool: ${name}` },
+        });
+    }
+    return res
+      .status(400)
+      .json({
+        jsonrpc: "2.0",
+        id,
+        error: { code: -32601, message: `Unknown method: ${method}` },
+      });
+  } catch (e) {
+    return res
+      .status(500)
+      .json({
+        jsonrpc: "2.0",
+        id,
+        error: { code: -32603, message: e?.message || "Internal error" },
+      });
+  }
+});
+
+const port = process.env.PORT || 4000;
+app.listen(port, () =>
+  console.log(`MCP HTTP listening at http://localhost:${port}/mcp`),
+);
+```
+
+Then set `MCP_BASE_URL=http://localhost:4000` in `.env` and restart. All MCP calls will route to your server.
 
 ## Using with Ollama
 
@@ -88,7 +205,7 @@ Update your `.env` file with Ollama settings:
 ```bash
 OPENAI_API_KEY=ollama
 OPENAI_BASE_URL=http://127.0.0.1:11434/v1
-MODEL_NAME=llama3.1:latest  # or any model you have installed
+MODEL_NAME=branko:latest  # or any model you have installed
 ```
 
 ### 3. Start the Application
@@ -98,6 +215,23 @@ pnpm dev
 ```
 
 The app will now use your local Ollama models instead of OpenAI!
+
+### WSL2: Windows Ollama via localhost
+
+If Ollama runs on Windows (not inside WSL) and you still want to use `OPENAI_BASE_URL=http://127.0.0.1:11434/v1` in WSL, run the local proxy that forwards to the Windows host IP:
+
+```bash
+# Set your Windows host IP if different
+export WINDOWS_OLLAMA_HOST_IP=192.168.128.1
+
+# Start proxy + dev (fixtures)
+pnpm dev:fixtures:with-proxy
+
+# Or proxy + dev
+pnpm dev:with-proxy
+```
+
+This binds `127.0.0.1:11434` in WSL and forwards to `http://$WINDOWS_OLLAMA_HOST_IP:11434` so the app can keep using localhost.
 
 ### Supported Models
 
@@ -203,8 +337,7 @@ These rules combine our internal `.cursor/rules/general.mdc` with the repo’s c
 
 **MCP Usage (JIRA Automation)**
 
-- MCP must be used for supported deterministic queries. Communication is STDIO and JSON‑RPC 2, or HTTP if configured.
-- The companion MCP server (`hello_world_mcp`) is included in this repo. Use `pnpm dev:mcp` when available.
+- MCP is used for supported deterministic queries. Communication is JSON‑RPC 2 over HTTP when `MCP_BASE_URL` is set, fixtures when `MCP_USE_FIXTURES=1`, or direct Jira calls by default. Stdio is not used.
 
 For more operational guidance, see `AGENTS.md`.
 
@@ -265,14 +398,7 @@ PORT=3000
 
 # Model Context Protocol (MCP) Integration
 
-This application integrates with the Model Context Protocol (MCP) to provide enhanced JIRA workflow automation. The system automatically detects deterministic queries and executes MCP tool calls to fetch real-time data from JIRA.
-
-## Features
-
-- 🔍 **Automatic Query Detection** - Recognizes JIRA-related queries and triggers MCP actions
-- 🛠️ **MCP Tool Integration** - Connects to local `hello_world_mcp` server for JIRA operations
-- 📊 **Structured Data Display** - Formats JIRA ticket data with status, assignee, and blockers
-- 🤖 **AI Enhancement** - Combines MCP data with LLM analysis for comprehensive responses
+This application integrates with MCP to enhance JIRA workflow automation. The system detects deterministic queries and executes MCP tool/resource calls to fetch data. No external MCP repo is required; the server provides built‑in adapters and supports fixtures.
 
 ## Supported Deterministic Queries
 
@@ -302,35 +428,11 @@ The system automatically handles these query patterns:
 
 ### Quick Start with MCP
 
-We've created a convenience script that starts both the MCP server and the main application:
+Default modes:
 
-```bash
-pnpm dev:mcp
-```
-
-This script:
-
-1. Checks if the MCP server exists at the expected path
-2. Creates a `.env` file in the MCP server directory if needed
-3. Starts the MCP server on port 3001
-4. Starts the main application
-
-### Manual MCP Server Setup
-
-The integration uses the `hello_world_mcp` server, located at:
-
-```
-../hello_world_mcp/src/server.js
-```
-
-Configure environment variables for the MCP server by creating a `.env` file in the `hello_world_mcp` directory:
-
-```
-# JIRA Configuration
-JIRA_BASE_URL=your_jira_base_url
-JIRA_EMAIL=your_jira_email
-JIRA_API_TOKEN=your_jira_api_token
-```
+- Direct Jira adapter: no extra setup; reads `JIRA_BASE_URL`, `JIRA_EMAIL`, `JIRA_API_TOKEN`.
+- Fixtures: set `MCP_USE_FIXTURES=1`.
+- External HTTP MCP (optional): set `MCP_BASE_URL` (e.g., `http://localhost:4000`).
 
 ### API Endpoints
 
@@ -378,8 +480,7 @@ The MCP integration consists of these key files:
 
 - `client/lib/mcp-client.ts` - MCP client communication
 - `client/lib/query-matcher.ts` - Query pattern detection and response formatting
-- `server/mcp/*` - MCP proxy server (tools/resources, fixtures, adapters)
-- `start-with-mcp.js` - Convenience script to start both servers
+- `server/mcp/*` - MCP tools/resources, fixtures, adapters
 
 ## E2E Tests
 

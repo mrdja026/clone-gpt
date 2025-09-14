@@ -1,5 +1,5 @@
 /**
- * MCP Client - Communicates with the local hello_world_mpc server
+ * MCP Client - Communicates with the app's MCP HTTP endpoints
  */
 
 export interface MCPToolRequest {

@@ -1,16 +1,27 @@
 import { test, expect } from '@playwright/test';
 
-test('SCRUM-8 triggers MCP and renders details', async ({ page }) => {
-
+test('SCRUM-8 triggers MCP and renders ticket details', async ({ page }) => {
   await page.goto('/');
 
-  // Type the prompt
   const textarea = page.getByPlaceholder('Ask anything…');
   await textarea.fill('SCRUM-8');
   await textarea.press('Enter');
 
-  // Expect UI to show analyzing state (MCP + LLM flow)
-  await expect(page.getByText('Analyzing', { exact: false })).toBeVisible({ timeout: 20_000 });
+  // MCP kicks in; UI shows analyzing
+  await expect(page.getByText('Analyzing', { exact: false })).toBeVisible({ timeout: 30_000 });
 
-  // No ping assertions; only verify visible Jira details
+  // From fixtures: ensure the core fields render (Summary, Assignee, Description)
+  await expect(page.getByText('JIRA Ticket: SCRUM-8', { exact: false })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText('Summary:', { exact: false })).toBeVisible();
+  await expect(page.getByText('Assignee:', { exact: false })).toBeVisible();
+  await expect(page.getByText('Description:', { exact: false })).toBeVisible();
+});
+
+test('Current sprint query renders sprint summary', async ({ page }) => {
+  await page.goto('/');
+  const textarea = page.getByPlaceholder('Ask anything…');
+  await textarea.fill('current sprint');
+  await textarea.press('Enter');
+  await expect(page.getByText('Analyzing', { exact: false })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText('Sprint Summary:', { exact: false })).toBeVisible({ timeout: 30_000 });
 });

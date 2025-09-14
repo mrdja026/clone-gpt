@@ -2,15 +2,12 @@ import { Injectable, Inject } from "@nestjs/common";
 import axios from "axios";
 import path from "path";
 import { fileURLToPath } from "url";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { ConfigService } from "@nestjs/config";
 import fs from "fs";
 import type { AxiosRequestConfig } from "axios";
 
 @Injectable()
 export class McpService {
-  private client: Client | null = null;
   private oauthToken: { accessToken: string; expiresAt: number } = {
     accessToken: "",
     expiresAt: 0,
@@ -25,9 +22,10 @@ export class McpService {
   }
 
   private getMcpBaseUrl() {
-    return (
-      this.configService.get<string>("MCP_BASE_URL") || "http://localhost:3001"
-    );
+    // Only use HTTP JSON-RPC when explicitly configured.
+    // Otherwise, prefer built-in adapters or stdio without a spurious 404.
+    const explicit = this.configService.get<string>("MCP_BASE_URL") || process.env.MCP_BASE_URL || "";
+    return explicit.trim();
   }
 
   // --- Internal HTTP-only adapter (no spawn) helpers ---
@@ -55,6 +53,19 @@ export class McpService {
       Authorization: `Basic ${auth}`,
       Accept: "application/json",
     } as Record<string, string>;
+  }
+
+  private async jiraAgileGet<T = any>(pathname: string, config?: AxiosRequestConfig) {
+    const { baseUrl } = this.getJiraConfig();
+    const headers = this.getJiraAuthHeaders();
+    if (!baseUrl || !headers) {
+      throw new Error(
+        "Missing Jira configuration. Set JIRA_BASE_URL, JIRA_EMAIL, and JIRA_API_TOKEN",
+      );
+    }
+    const url = `${this.normalizeBaseUrl(baseUrl)}/rest/agile/1.0${pathname}`;
+    const res = await axios.get<T>(url, { headers, ...(config || {}) });
+    return res.data as T;
   }
 
   private normalizeBaseUrl(url: string) {
@@ -168,6 +179,77 @@ export class McpService {
     return this.jiraGet<any>("/rest/api/3/myself");
   }
 
+  private async fetchCurrentSprintSummary() {
+    // Dev/test fixtures first
+    try {
+      const useFixtures =
+        process.env.MCP_USE_FIXTURES === "1" ||
+        process.env.MCP_USE_FIXTURES === "true";
+      if (useFixtures) {
+        const fromHere = path.resolve(this.getCurrentDirname(), "../../fixtures/jira");
+        const fromCwd = path.resolve(process.cwd(), "server/fixtures/jira");
+        const candidateDirs = [fromHere, fromCwd];
+        for (const dir of candidateDirs) {
+          const fixturePath = path.join(dir, `current-sprint.json`);
+          if (fs.existsSync(fixturePath)) {
+            const raw = fs.readFileSync(fixturePath, "utf-8");
+            return JSON.parse(raw);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("[MCP] Fixture load failed; falling back (current sprint)", {
+        message: (e as any)?.message,
+      });
+    }
+    // Live Jira via Agile API
+    // Strategy: use JIRA_BOARD_ID if set; otherwise try project key discovery.
+    const boardId = process.env.JIRA_BOARD_ID;
+    const projectKey = process.env.JIRA_PROJECT_KEY;
+    try {
+      let useBoardId: number | null = null;
+      if (boardId && /^\d+$/.test(boardId)) {
+        useBoardId = Number(boardId);
+      } else if (projectKey) {
+        const boards = await this.jiraAgileGet<any>(
+          `/board?projectKeyOrId=${encodeURIComponent(projectKey)}`,
+        );
+        useBoardId = boards?.values?.[0]?.id ?? null;
+      } else {
+        const boards = await this.jiraAgileGet<any>(`/board`);
+        useBoardId = boards?.values?.[0]?.id ?? null;
+      }
+
+      if (!useBoardId) {
+        throw new Error("Could not determine Jira board id. Set JIRA_BOARD_ID or JIRA_PROJECT_KEY.");
+      }
+
+      const sprints = await this.jiraAgileGet<any>(
+        `/board/${useBoardId}/sprint?state=active`,
+      );
+      const active = sprints?.values?.[0];
+      if (!active) {
+        return { summary: "No active sprints found" };
+      }
+      // Sprint details
+      const sprint = await this.jiraAgileGet<any>(`/sprint/${active.id}`);
+      return {
+        name: sprint?.name || active.name,
+        state: sprint?.state || active.state,
+        startDate: sprint?.startDate || active.startDate || null,
+        endDate: sprint?.endDate || active.endDate || null,
+        goal: sprint?.goal || "",
+        summary: sprint?.name || active.name,
+      };
+    } catch (e: any) {
+      throw new Error(
+        `Failed to retrieve current sprint: ${e?.response?.status || ''} ${
+          e?.response?.data?.message || e?.message || 'Unknown error'
+        }`,
+      );
+    }
+  }
+
   private async listJiraProjects() {
     const data = await this.jiraGet<any>("/rest/api/3/project/search");
     const values = data?.values || [];
@@ -179,275 +261,229 @@ export class McpService {
     }));
   }
 
-  private async ensureStdIoClient(): Promise<Client> {
-    if (this.client) return this.client;
-    const nodeExecutable = process.platform === "win32" ? "node.exe" : "node";
-    // Allow overriding MCP server path via env (e.g., external workspace)
-    const envServerPath = process.env.MCP_SERVER_PATH;
-    // Compute robust defaults: relative to this file AND to project cwd
-    const candidateFromHere = path.resolve(
-      this.getCurrentDirname(),
-      "../../../hello_world_mcp/src/server.js",
-    );
-    const candidateFromCwd = path.resolve(
-      process.cwd(),
-      "hello_world_mcp/src/server.js",
-    );
-    const defaultServerPath = fs.existsSync(candidateFromHere)
-      ? candidateFromHere
-      : candidateFromCwd;
-    const mcpServerPath = envServerPath || defaultServerPath;
-    const resolvedCwd = path.dirname(mcpServerPath);
-    const serverExists = fs.existsSync(mcpServerPath);
-    const cwdExists = fs.existsSync(resolvedCwd);
-    const stat = serverExists ? fs.statSync(mcpServerPath) : null;
-    console.log("[MCP] ensureStdIoClient", {
-      nodeExecutable,
-      mcpServerPath,
-      serverExists,
-      serverSize: stat?.size ?? null,
-      resolvedCwd,
-      cwdExists,
-      usingExternalPath: !!envServerPath,
-      candidateFromHere,
-      candidateFromCwd,
-    });
-    const env = {
-      ...process.env,
-      // Basic auth credentials for Jira (preferred for free-tier)
-      JIRA_BASE_URL: this.configService.get("JIRA_BASE_URL") || process.env.JIRA_BASE_URL,
-      JIRA_EMAIL: this.configService.get("JIRA_EMAIL") || process.env.JIRA_EMAIL,
-      JIRA_API_TOKEN: this.configService.get("JIRA_API_TOKEN") || process.env.JIRA_API_TOKEN,
-      JIRA_OAUTH_CLIENT_ID: this.configService.get("JIRA_OAUTH_CLIENT_ID"),
-      JIRA_OAUTH_CLIENT_SECRET: this.configService.get(
-        "JIRA_OAUTH_CLIENT_SECRET",
-      ),
-      JIRA_OAUTH_AUDIENCE: this.configService.get(
-        "JIRA_OAUTH_AUDIENCE",
-        "api.atlassian.com",
-      ),
-      JIRA_CLOUD_ID: this.configService.get("JIRA_CLOUD_ID"),
-    } as Record<string, string | undefined>;
-
-    try {
-      if (!serverExists) {
-        console.error("[MCP] Server path does not exist", { mcpServerPath });
-      }
-      if (!cwdExists) {
-        console.error("[MCP] Working directory does not exist", { resolvedCwd });
-      }
-
-      const transport = new StdioClientTransport({
-        command: nodeExecutable,
-        args: [mcpServerPath],
-        env,
-        cwd: resolvedCwd,
-      });
-
-      const client = new Client(
-        { name: "clone-gpt-mcp-proxy", version: "1.0.0" },
-        { capabilities: { tools: {}, resources: {} } },
-      );
-      await client.connect(transport);
-      this.client = client;
-      console.log("[MCP] Connected via stdio", { mcpServerPath });
-      return client;
-    } catch (e: any) {
-      console.error("[MCP] Failed to connect via stdio", {
-        mcpServerPath,
-        resolvedCwd,
-        serverExists,
-        cwdExists,
-        message: e?.message,
-        stack: e?.stack?.split("\n").slice(0, 3).join(" ") ?? null,
-      });
-      throw e;
-    }
-  }
 
   private async callRpc<T = any>(method: string, params?: any): Promise<T> {
-    // Try HTTP first
-    try {
-      const url = `${this.getMcpBaseUrl()}/mcp`;
+    const base = this.getMcpBaseUrl();
+    const useFixtures =
+      process.env.MCP_USE_FIXTURES === "true" || process.env.MCP_USE_FIXTURES === "1";
+
+    // 1) If an HTTP MCP is configured, use it exclusively
+    if (base) {
+      const url = `${base.replace(/\/$/, "")}/mcp`;
       const res = await axios.post(
         url,
         { jsonrpc: "2.0", id: method, method, params },
         { timeout: 65000 },
       );
       return res.data as T;
-    } catch (err: any) {
-      // If fixtures are enabled, use internal adapter for known tools/resources
-      console.warn("[MCP] HTTP call failed; selecting fallback", {
-        method,
-        baseUrl: this.getMcpBaseUrl(),
-        httpError: err?.message,
-      });
-      const useFixtures =
-        process.env.MCP_USE_FIXTURES === "true" || process.env.MCP_USE_FIXTURES === "1";
-      if (useFixtures) {
-        try {
-          // Internal adapter only supports minimal surface we need
-          if (method === "listTools") {
-            return {
-              tools: [
-                {
-                  name: "process_text",
-                  title: "Process Text",
-                  description: "Pass-through processor for formatted commands",
-                  inputSchema: {
-                    type: "object",
-                    properties: { text: { type: "string" } },
-                    required: ["text"],
-                    additionalProperties: false,
-                    $schema: "http://json-schema.org/draft-07/schema#",
-                  },
-                },
-                {
-                  name: "fetch_jira_ticket",
-                  title: "Fetch Jira Ticket",
-                  description: "Fetch a Jira ticket by key (e.g., SCRUM-8)",
-                  inputSchema: {
-                    type: "object",
-                    properties: { ticketKey: { type: "string" } },
-                    required: ["ticketKey"],
-                    additionalProperties: false,
-                    $schema: "http://json-schema.org/draft-07/schema#",
-                  },
-                },
-                {
-                  name: "fetch_jira_myself",
-                  title: "Fetch Jira Myself",
-                  description: "Fetch current Jira user profile to validate credentials",
-                  inputSchema: {
-                    type: "object",
-                    properties: {},
-                    additionalProperties: false,
-                    $schema: "http://json-schema.org/draft-07/schema#",
-                  },
-                },
-              ],
-            } as unknown as T;
-          }
-          if (method === "listResources") {
-            return {
-              resources: [
-                {
-                  uri: "mcp://local-mcp-server/jira/projects",
-                  name: "Jira Projects",
-                  description: "List Jira projects",
-                },
-              ],
-            } as unknown as T;
-          }
-          if (method === "callTool") {
-            const name = params?.name as string;
-            const args = (params?.arguments || {}) as Record<string, any>;
-            if (name === "process_text") {
-              return {
-                content: [{ type: "text", text: String(args.text ?? "") }],
-              } as unknown as T;
-            }
-            if (name === "fetch_jira_ticket") {
-              const ticketKey = String(args.ticketKey || "");
-              try {
-                const data = await this.fetchJiraIssue(ticketKey);
-                return {
-                  content: [{ type: "text", text: JSON.stringify(data) }],
-                } as unknown as T;
-              } catch (e: any) {
-                return {
-                  content: [
-                    {
-                      type: "text",
-                      text: JSON.stringify({
-                        error: "Failed to fetch Jira ticket",
-                        message: e?.message || "Unknown error",
-                      }),
-                    },
-                  ],
-                  isError: true,
-                } as unknown as T;
-              }
-            }
-            if (name === "fetch_jira_myself") {
-              try {
-                const data = await this.fetchJiraMyself();
-                return {
-                  content: [{ type: "text", text: JSON.stringify(data) }],
-                } as unknown as T;
-              } catch (e: any) {
-                return {
-                  content: [
-                    {
-                      type: "text",
-                      text: JSON.stringify({
-                        error: "Failed to fetch Jira myself",
-                        message: e?.message || "Unknown error",
-                      }),
-                    },
-                  ],
-                  isError: true,
-                } as unknown as T;
-              }
-            }
-            throw new Error(`Unknown tool: ${name}`);
-          }
-          if (method === "readResource") {
-            const uri = params?.uri as string;
-            if (uri === "mcp://local-mcp-server/jira/projects") {
-              try {
-                const projects = await this.listJiraProjects();
-                return {
-                  contents: [
-                    { uri, text: JSON.stringify(projects) },
-                  ],
-                } as unknown as T;
-              } catch (e: any) {
-                return {
-                  contents: [
-                    {
-                      uri,
-                      text: JSON.stringify({
-                        error: "Failed to list projects",
-                        message: e?.message || "Unknown error",
-                      }),
-                    },
-                  ],
-                } as unknown as T;
-              }
-            }
-            throw new Error(`Unknown resource: ${uri}`);
-          }
-        } catch (localErr) {
-          // Fall through to throw meaningful message
-          throw localErr;
-        }
+    }
+
+    // 2) If fixtures are enabled, serve via internal fixtures
+    if (useFixtures) {
+      if (method === "listTools") {
+        return {
+          tools: [
+            {
+              name: "process_text",
+              title: "Process Text",
+              description: "Pass-through processor for formatted commands",
+              inputSchema: {
+                type: "object",
+                properties: { text: { type: "string" } },
+                required: ["text"],
+                additionalProperties: false,
+                $schema: "http://json-schema.org/draft-07/schema#",
+              },
+            },
+            {
+              name: "fetch_jira_ticket",
+              title: "Fetch Jira Ticket",
+              description: "Fetch a Jira ticket by key (e.g., SCRUM-8)",
+              inputSchema: {
+                type: "object",
+                properties: { ticketKey: { type: "string" } },
+                required: ["ticketKey"],
+                additionalProperties: false,
+                $schema: "http://json-schema.org/draft-07/schema#",
+              },
+            },
+            {
+              name: "fetch_jira_myself",
+              title: "Fetch Jira Myself",
+              description: "Fetch current Jira user profile to validate credentials",
+              inputSchema: {
+                type: "object",
+                properties: {},
+                additionalProperties: false,
+                $schema: "http://json-schema.org/draft-07/schema#",
+              },
+            },
+            {
+              name: "get_current_sprint_summary",
+              title: "Get Current Sprint Summary",
+              description: "Return the current sprint summary (fixtures-only by default)",
+              inputSchema: {
+                type: "object",
+                properties: {},
+                additionalProperties: false,
+                $schema: "http://json-schema.org/draft-07/schema#",
+              },
+            },
+          ],
+        } as unknown as T;
       }
-      // Built-in adapter: handle select tools/resources without requiring stdio MCP
+      if (method === "listResources") {
+        return {
+          resources: [
+            {
+              uri: "mcp://local-mcp-server/jira/projects",
+              name: "Jira Projects",
+              description: "List Jira projects",
+            },
+            {
+              uri: "mcp://local-mcp-server/jira/current-sprint",
+              name: "Current Sprint",
+              description: "Summary of the current active sprint",
+            },
+          ],
+        } as unknown as T;
+      }
       if (method === "callTool") {
-        const toolName = params?.name as string;
+        const name = params?.name as string;
+        const args = (params?.arguments || {}) as Record<string, any>;
+        if (name === "process_text") {
+          return {
+            content: [{ type: "text", text: String(args.text ?? "") }],
+          } as unknown as T;
+        }
+        if (name === "fetch_jira_ticket") {
+          const ticketKey = String(args.ticketKey || "");
+          const data = await this.fetchJiraIssue(ticketKey);
+          return {
+            content: [{ type: "text", text: JSON.stringify(data) }],
+          } as unknown as T;
+        }
+        if (name === "get_current_sprint_summary") {
+          const data = await this.fetchCurrentSprintSummary();
+          return {
+            content: [{ type: "text", text: JSON.stringify(data) }],
+          } as unknown as T;
+        }
+        if (name === "fetch_jira_myself") {
+          const data = await this.fetchJiraMyself();
+          return {
+            content: [{ type: "text", text: JSON.stringify(data) }],
+          } as unknown as T;
+        }
+        throw new Error(`Unknown tool: ${name}`);
+      }
+      if (method === "readResource") {
+        const uri = params?.uri as string;
+        if (uri === "mcp://local-mcp-server/jira/projects") {
+          const projects = await this.listJiraProjects();
+          return {
+            contents: [{ uri, text: JSON.stringify(projects) }],
+          } as unknown as T;
+        }
+        if (uri === "mcp://local-mcp-server/jira/current-sprint") {
+          const summary = await this.fetchCurrentSprintSummary();
+          return {
+            contents: [{ uri, text: JSON.stringify(summary) }],
+          } as unknown as T;
+        }
+        throw new Error(`Unknown resource: ${uri}`);
+      }
+    }
+
+    // 3) Default: built-in direct Jira adapter (no Repo B needed)
+    if (method === "listTools") {
+      return {
+        tools: [
+          {
+            name: "process_text",
+            title: "Process Text",
+            description: "Pass-through processor for formatted commands",
+            inputSchema: {
+              type: "object",
+              properties: { text: { type: "string" } },
+              required: ["text"],
+              additionalProperties: false,
+              $schema: "http://json-schema.org/draft-07/schema#",
+            },
+          },
+          {
+            name: "fetch_jira_ticket",
+            title: "Fetch Jira Ticket",
+            description: "Fetch a Jira ticket by key",
+            inputSchema: {
+              type: "object",
+              properties: { ticketKey: { type: "string" } },
+              required: ["ticketKey"],
+              additionalProperties: false,
+              $schema: "http://json-schema.org/draft-07/schema#",
+            },
+          },
+          {
+            name: "get_current_sprint_summary",
+            title: "Get Current Sprint Summary",
+            description:
+              "Return the current sprint summary (requires fixtures or additional Jira config)",
+            inputSchema: {
+              type: "object",
+              properties: {},
+              additionalProperties: false,
+              $schema: "http://json-schema.org/draft-07/schema#",
+            },
+          },
+          {
+            name: "fetch_jira_myself",
+            title: "Fetch Jira Myself",
+            description: "Fetch current Jira user profile",
+            inputSchema: {
+              type: "object",
+              properties: {},
+              additionalProperties: false,
+              $schema: "http://json-schema.org/draft-07/schema#",
+            },
+          },
+        ],
+      } as unknown as T;
+    }
+    if (method === "listResources") {
+      return {
+        resources: [
+          {
+            uri: "mcp://local-mcp-server/jira/projects",
+            name: "Jira Projects",
+            description: "List Jira projects",
+          },
+        ],
+      } as unknown as T;
+    }
+    if (method === "callTool") {
+      const name = params?.name as string;
+      const args = (params?.arguments || {}) as Record<string, any>;
+      if (name === "process_text") {
+        return {
+          content: [{ type: "text", text: String(args.text ?? "") }],
+        } as unknown as T;
+      }
+      if (name === "fetch_jira_ticket") {
         try {
-          if (toolName === "fetch_jira_myself") {
-            const data = await this.fetchJiraMyself();
-            return {
-              content: [{ type: "text", text: JSON.stringify(data) }],
-            } as unknown as T;
-          }
-          if (toolName === "fetch_jira_ticket") {
-            const ticketKey = String(params?.arguments?.ticketKey || "");
-            const data = await this.fetchJiraIssue(ticketKey);
-            return {
-              content: [{ type: "text", text: JSON.stringify(data) }],
-            } as unknown as T;
-          }
+          const ticketKey = String(args.ticketKey || "");
+          const data = await this.fetchJiraIssue(ticketKey);
+          return {
+            content: [{ type: "text", text: JSON.stringify(data) }],
+          } as unknown as T;
         } catch (e: any) {
           return {
             content: [
               {
                 type: "text",
                 text: JSON.stringify({
-                  error: `Failed to fetch via ${toolName}`,
-                  message: e?.message || "Unknown error",
+                  error: "Failed to fetch Jira ticket",
+                  message: e?.response?.data?.errorMessages?.[0] || e?.message || "Unknown error",
+                  status: e?.response?.status || 500,
                 }),
               },
             ],
@@ -455,49 +491,101 @@ export class McpService {
           } as unknown as T;
         }
       }
-      if (method === "readResource") {
-        const uri = params?.uri as string;
-        if (uri === "mcp://local-mcp-server/jira/projects") {
-          try {
-            const projects = await this.listJiraProjects();
-            return {
-              contents: [{ uri, text: JSON.stringify(projects) }],
-            } as unknown as T;
-          } catch (e: any) {
-            return {
-              contents: [
-                {
-                  uri,
-                  text: JSON.stringify({
-                    error: "Failed to list projects",
-                    message: e?.message || "Unknown error",
-                  }),
-                },
-              ],
-            } as unknown as T;
-          }
+      if (name === "get_current_sprint_summary") {
+        try {
+          const data = await this.fetchCurrentSprintSummary();
+          return {
+            content: [{ type: "text", text: JSON.stringify(data) }],
+          } as unknown as T;
+        } catch (e: any) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify({
+                  error: "Failed to fetch current sprint summary",
+                  message: e?.response?.data?.errorMessages?.[0] || e?.message || "Unknown error",
+                  status: e?.response?.status || 500,
+                }),
+              },
+            ],
+            isError: true,
+          } as unknown as T;
         }
       }
-
-      const client = await this.ensureStdIoClient();
-      try {
-        if (method === "listTools") return client.listTools() as unknown as T;
-        if (method === "listResources")
-          return client.listResources() as unknown as T;
-        if (method === "callTool")
-          return client.callTool(params) as unknown as T;
-        if (method === "readResource")
-          return client.readResource(params) as unknown as T;
-      } catch (stdioErr: any) {
-        console.error("[MCP] stdio call failed", {
-          method,
-          message: stdioErr?.message,
-          stack: stdioErr?.stack?.split("\n").slice(0, 3).join(" ") ?? null,
-        });
-        throw stdioErr;
+      if (name === "fetch_jira_myself") {
+        try {
+          const data = await this.fetchJiraMyself();
+          return {
+            content: [{ type: "text", text: JSON.stringify(data) }],
+          } as unknown as T;
+        } catch (e: any) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify({
+                  error: "Failed to fetch Jira myself",
+                  message: e?.response?.data?.errorMessages?.[0] || e?.message || "Unknown error",
+                  status: e?.response?.status || 500,
+                }),
+              },
+            ],
+            isError: true,
+          } as unknown as T;
+        }
       }
-      throw err;
+      throw new Error(`Unknown tool: ${name}`);
     }
+    if (method === "readResource") {
+      const uri = params?.uri as string;
+      if (uri === "mcp://local-mcp-server/jira/projects") {
+        try {
+          const projects = await this.listJiraProjects();
+          return {
+            contents: [{ uri, text: JSON.stringify(projects) }],
+          } as unknown as T;
+        } catch (e: any) {
+          return {
+            contents: [
+              {
+                uri,
+                text: JSON.stringify({
+                  error: "Failed to list projects",
+                  message: e?.response?.data?.errorMessages?.[0] || e?.message || "Unknown error",
+                  status: e?.response?.status || 500,
+                }),
+              },
+            ],
+          } as unknown as T;
+        }
+      }
+      if (uri === "mcp://local-mcp-server/jira/current-sprint") {
+        try {
+          const summary = await this.fetchCurrentSprintSummary();
+          return {
+            contents: [{ uri, text: JSON.stringify(summary) }],
+          } as unknown as T;
+        } catch (e: any) {
+          return {
+            contents: [
+              {
+                uri,
+                text: JSON.stringify({
+                  error: "Failed to get current sprint summary",
+                  message: e?.response?.data?.errorMessages?.[0] || e?.message || "Unknown error",
+                  status: e?.response?.status || 500,
+                }),
+              },
+            ],
+          } as unknown as T;
+        }
+      }
+      throw new Error(`Unknown resource: ${uri}`);
+    }
+
+    // If we reach here, method unsupported
+    throw new Error(`Unsupported method: ${method}`);
   }
 
   async getOAuthToken(): Promise<string> {

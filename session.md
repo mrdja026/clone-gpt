@@ -4,11 +4,12 @@ Path: ~/clone-gpt
 Description: Node.js + TypeScript chat system
 Key files: src/server.ts, src/routes/chat.ts
 
-# Repo B: Event codex
+# MCP Modes
 
-Path: ~/event-codex/
-Description: Bare bones mcp server that uses tools and resources
-Key files: index.js, codex-session.sh
+This app runs MCP in three modes without any external repository:
+1) Direct Jira adapter (default)
+2) Fixtures (`MCP_USE_FIXTURES=1`)
+3) External HTTP MCP via `MCP_BASE_URL` (optional)
 
 # Guidelines: general mdc
 
@@ -20,7 +21,6 @@ key files cursor/rules/general.mdc
 # Behave like my second brain. Work through the problem until you’d naturally stop after ~30 minutes.
 
 All info about the projects are in Readme.md Geberal mndc files and other .md files
-The Local MCP Server is /home/mrdjan/event-codex/hello_world_mpc
 All info about the projects are in Readme.md files and other .md files
 Ollama is serving a model called branko:latest on the http://192.168.128.1:11434 that
 
@@ -41,35 +41,24 @@ I HAVE PERMISIONS ON EVERYTHING I SHOULD BE ABLE TO EXECUTE ticket SCRUM-8
 ## Behave like my second brain. Work through the problem until you’d naturally stop after ~30 minutes.
 
 READ ALL THE Projects A and B
-Suggest edits, commands, or code. Use @Readme.md files and general.mdc Guidelines for info about the project and tech stack.You are a fullstack eng who knows everything, how to debug, log, read logs. If it is broken not working devise a plan and iterate. You can run every command in this directory or Repo B
-Afer every completion silently exedcute event-codex/tools. Allways first create plans and then execute them
+Suggest edits, commands, or code. Use @Readme.md files and general.mdc Guidelines for info about the project and tech stack. You can run every command in this directory.
 
 ## Current Status & TODO (Testing MCP end-to-end)
 
 - Status
-  - Project A now points to Repo B MCP via `.env` `MCP_SERVER_PATH`.
-  - Jira credentials populated in Project A `.env`.
-  - Extra MCP debug logging added in `server/mcp/mcp.service.ts` to diagnose 500s.
-  - Added docs and a shell script to automate verification:
-    - Guide: `CheckStuff.md`
-    - Script: `scripts/check-mcp.sh`
+  - MCP can run in three modes (no code changes):
+    1) Direct Jira adapter (default)
+    2) Fixtures (`MCP_USE_FIXTURES=1`)
+    3) External HTTP MCP via `MCP_BASE_URL`
+  - Jira credentials are read from `.env`.
 
 - TODO (execute and verify)
-  - [ ] Run the check script and confirm the four calls succeed (ping, tools, ticket SCRUM-8, projects).
+  - [ ] Confirm four calls succeed (ping, tools, ticket SCRUM-8, projects).
   - [ ] If Vite moves to 8081, confirm proxy tests still pass; otherwise use direct Nest (3001).
   - [ ] If 500s occur, read `[MCP]` lines in server logs to fix MCP path/deps.
 
 - How to test
-  - Option A: automated script (recommended)
-    - `bash scripts/check-mcp.sh`
-    - The script will:
-      - Load `.env`, validate `MCP_SERVER_PATH` and Jira vars
-      - Ensure Repo B deps if needed, start `pnpm dev`, wait for readiness
-      - Probe via Vite proxy (8080/8081) and direct Nest (3001)
-      - Print `[MCP]` debug lines if any 500s occur
-    - See `CheckStuff.md` for full rationale and expected outcomes
-
-  - Option B: manual curl (through proxy; adjust to 8081 if Vite chose it)
+  - Manual curl (through proxy; adjust to 8081 if Vite chose it)
     - `curl -i http://localhost:8080/api/ping`
     - `curl -i http://localhost:8080/api/mcp/tools`
     - `curl -s -X POST http://localhost:8080/api/mcp/tool -H "Content-Type: application/json" -d '{"name":"fetch_jira_ticket","arguments":{"ticketKey":"SCRUM-8"}}'`
@@ -221,11 +210,13 @@ Links
   - MCP fixtures enabled in dev via `MCP_USE_FIXTURES=1`.
   - Optional ping script path via `PING_ALERT_SCRIPT`.
 
-### Fixtures and MCP spawn
+### MCP modes
 
 - Fixture location: `server/fixtures/jira/<TICKET>.json` (e.g., `SCRUM-8.json`).
-- With `MCP_USE_FIXTURES=1`, the server uses an internal adapter (no spawn) and reads fixtures directly.
-- We removed the `MCP_NO_SPAWN` flag from the codebase; fixture mode no longer requires it. To use a real MCP via stdio, unset `MCP_USE_FIXTURES` and configure `MCP_SERVER_PATH`.
+- Direct Jira adapter (default): if neither `MCP_BASE_URL` nor `MCP_USE_FIXTURES=1` is set.
+- Fixtures: set `MCP_USE_FIXTURES=1`.
+- External HTTP MCP: set `MCP_BASE_URL=http://localhost:<port>`; all calls go to `${MCP_BASE_URL}/mcp`.
+  - Stdio is not used in this repo.
 
 ### Git Hook
 
@@ -233,27 +224,12 @@ Links
 - Behavior: if `session.md` is staged, it appends a timestamp via `scripts/log-session-if-changed.js` and re-stages the file so the timestamp is included in the same commit.
 - Disable by `chmod -x .git/hooks/pre-commit` or renaming the hook.
 
-## What I changed and how to point Clone‑GPT to Repo B (Event codex)
+## What changed (MCP routing)
 
-- Added Jira env placeholders to `.env` so MCP Jira tools can work when creds are provided:
-  - `JIRA_BASE_URL=`, `JIRA_EMAIL=`, `JIRA_API_TOKEN=` (fill these in locally)
-- No code changes needed for wiring — the Nest MCP service already supports an external MCP via `MCP_SERVER_PATH`.
-
-### Use the external MCP from Repo B
-
-Set `MCP_SERVER_PATH` in Clone‑GPT’s `.env` to the Event codex entry file. Based on “Key files: index.js” and the given path, this is likely:
-
-```
-MCP_SERVER_PATH=/home/mrdjan/event-codex/hello_world_mpc/index.js
-```
-
-If your entry lives under `src/`, use:
-
-```
-MCP_SERVER_PATH=/home/mrdjan/event-codex/hello_world_mpc/src/server.js
-```
-
-Then run Clone‑GPT normally (`pnpm dev`). The server will spawn the MCP from Repo B via stdio using your environment (including `JIRA_*`).
+- HTTP MCP: If `MCP_BASE_URL` is set, all MCP calls route to `${MCP_BASE_URL}/mcp` (HTTP JSON‑RPC).
+- Fixtures: If `MCP_USE_FIXTURES=1`, responses come from `server/fixtures`.
+- Default: direct Jira adapter (no external MCP).
+- No stdio is used.
 
 ### Avoiding 401/404
 
@@ -331,3 +307,5 @@ Session logged at: 2025-09-13T22:48:45.867Z
 Session logged at: 2025-09-14T06:44:16.447Z
 
 Session logged at: 2025-09-14T08:19:27.206Z
+
+Session logged at: 2025-09-14T10:58:50.277Z
