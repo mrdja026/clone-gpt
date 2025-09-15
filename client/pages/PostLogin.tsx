@@ -9,7 +9,6 @@ import { mcpClient } from "@/lib/mcp-client";
 import { cn } from "@/lib/utils";
 import { useNavigate, Link } from "react-router-dom";
 // icons used via ThemeToggle
-import AboutDialog from "@/components/AboutDialog";
 import AboutContent from "@/components/AboutContent";
 import AppHeader from "@/components/AppHeader";
 import ProvidersMenu from "@/components/ProvidersMenu";
@@ -33,7 +32,10 @@ async function callModelStreaming(
   onUpdate: (chunk: string) => void,
 ): Promise<string> {
   try {
-    const messages = conversationHistory.map((m) => ({ role: m.role, content: m.content }));
+    const messages = conversationHistory.map((m) => ({
+      role: m.role,
+      content: m.content,
+    }));
     messages.push({ role: "user" as const, content: prompt });
 
     const response = await fetch("/api/chat/stream", {
@@ -68,7 +70,9 @@ async function callModelStreaming(
 export default function PostLogin() {
   const navigate = useNavigate();
   // Theme is controlled via ThemeToggle component
-  const [pendingPrompt, setPendingPrompt] = useState<string | undefined>(undefined);
+  const [pendingPrompt, setPendingPrompt] = useState<string | undefined>(
+    undefined,
+  );
   const [conversations, setConversations] = useState<Conversation[]>([
     { id: uid("conv"), title: "New chat", messages: [], createdAt: Date.now() },
   ]);
@@ -163,7 +167,10 @@ export default function PostLogin() {
                   ...c,
                   messages: c.messages.map((m) =>
                     m.id === botMessageId
-                      ? { ...m, content: `${mcpResults}\n\n🤖 Analyzing data...` }
+                      ? {
+                          ...m,
+                          content: `${mcpResults}\n\n🤖 Analyzing data...`,
+                        }
                       : m,
                   ),
                 }
@@ -189,41 +196,44 @@ export default function PostLogin() {
     }
 
     // Stream model response
-    const conversationHistory = conversations.find((c) => c.id === activeId)?.messages || [];
+    const conversationHistory =
+      conversations.find((c) => c.id === activeId)?.messages || [];
     let llmResponse = "";
     try {
-      await callModelStreaming(
-        enhancedPrompt,
-        conversationHistory,
-        (chunk) => {
-          llmResponse += chunk;
-          const currentContent = mcpResults ? `${mcpResults}\n\n**Analysis:**\n` : "";
-          setConversations((prev) =>
-            prev.map((c) =>
-              c.id === activeId
-                ? {
-                    ...c,
-                    messages: c.messages.map((m) =>
-                      m.id === botMessageId
-                        ? { ...m, content: currentContent + llmResponse }
-                        : m,
-                    ),
-                  }
-                : c,
-            ),
-          );
-        },
-      );
+      await callModelStreaming(enhancedPrompt, conversationHistory, (chunk) => {
+        llmResponse += chunk;
+        const currentContent = mcpResults
+          ? `${mcpResults}\n\n**Analysis:**\n`
+          : "";
+        setConversations((prev) =>
+          prev.map((c) =>
+            c.id === activeId
+              ? {
+                  ...c,
+                  messages: c.messages.map((m) =>
+                    m.id === botMessageId
+                      ? { ...m, content: currentContent + llmResponse }
+                      : m,
+                  ),
+                }
+              : c,
+          ),
+        );
+      });
     } finally {
       // Ensure final content is set
-      const finalContent = mcpResults ? `${mcpResults}\n\n**Analysis:**\n${llmResponse}` : llmResponse;
+      const finalContent = mcpResults
+        ? `${mcpResults}\n\n**Analysis:**\n${llmResponse}`
+        : llmResponse;
       setConversations((prev) =>
         prev.map((c) =>
           c.id === activeId
             ? {
                 ...c,
                 messages: c.messages.map((m) =>
-                  m.id === botMessageId ? { ...m, content: finalContent || m.content } : m,
+                  m.id === botMessageId
+                    ? { ...m, content: finalContent || m.content }
+                    : m,
                 ),
               }
             : c,
@@ -247,7 +257,9 @@ export default function PostLogin() {
 
     try {
       const existingRaw = localStorage.getItem(STORAGE_KEY);
-      const existing: Conversation[] = existingRaw ? JSON.parse(existingRaw) : [];
+      const existing: Conversation[] = existingRaw
+        ? JSON.parse(existingRaw)
+        : [];
       const filtered = finalConv
         ? existing.filter((c) => c.id !== finalConv.id)
         : existing;
@@ -268,7 +280,9 @@ export default function PostLogin() {
     if (idx < 0) return;
     const baseGroup = current.groupId ?? current.id;
     const seed = current.messages.slice(0, idx + 1);
-    const existing = conversations.filter((c) => (c.groupId ?? c.id) === baseGroup);
+    const existing = conversations.filter(
+      (c) => (c.groupId ?? c.id) === baseGroup,
+    );
     const count = existing.filter((c) => c.parentId === baseGroup).length;
     const newConv: Conversation = {
       id: uid("conv"),
@@ -288,104 +302,124 @@ export default function PostLogin() {
         subtitle="Your Jira co-pilot"
         right={
           <>
-            <AboutDialog trigger={<Button variant="ghost" size="sm">About</Button>} />
+            <Button variant="ghost" size="sm" asChild>
+              <Link to="/about">About</Link>
+            </Button>
             <ProvidersMenu />
             <Button variant="ghost" size="sm" asChild>
               <Link to="/diagnostics">Diagnostics</Link>
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => navigate("/chat")}>Open Full Chat</Button>
+            <Button variant="ghost" size="sm" onClick={() => navigate("/chat")}>
+              Open Full Chat
+            </Button>
             <ThemeToggle />
           </>
         }
       />
 
       <main className="container mx-auto py-12 md:py-16">
-        {/* Hero */}
-        <section className="mb-10">
-          <div className="mx-auto max-w-3xl text-center">
-            <h1 className="text-3xl md:text-4xl font-semibold tracking-tight">
-              Welcome back — let’s ship smarter
-            </h1>
-            <p className="mt-3 text-muted-foreground">
-              Search ready‑made prompts, preview the response, then hop into the full chat when you’re ready.
-            </p>
-          </div>
-        </section>
-
-        {/* Search + Chat panel */}
-        <section
-          className={cn(
-            "rounded-3xl border bg-card/60 backdrop-blur ring-1 ring-border",
-            "p-6 md:p-8 shadow-sm",
-          )}
-        >
-          <div className="max-w-3xl mx-auto w-full">
-            <QuerySearch
-              queries={deterministicQueries}
-              onSelect={(t) => setPendingPrompt(t)}
-              className="mb-4"
-            />
-          </div>
-          <div className="rounded-3xl border bg-background/80 shadow-md">
-            <ChatArea
-              conversation={active}
-              siblingConversations={siblings}
-              onSend={onSend}
-              onBranchFrom={onBranchFrom}
-              onSwitchConversation={(id) => setActiveId(id)}
-              onCloseConversation={(id) =>
-                setConversations((prev) => prev.filter((c) => c.id !== id))
-              }
-              initialPrompt={pendingPrompt}
-            />
-          </div>
-        </section>
-
-        {/* Connect to provider */}
-        <section className="mt-12">
-          <div className="mx-auto max-w-5xl">
-            <h2 className="text-lg font-semibold mb-4">Connect to provider</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="rounded-xl border bg-card p-5">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="font-medium">Perplexity</div>
-                    <div className="text-sm text-muted-foreground">Set up your Perplexity credentials</div>
-                  </div>
-                  <Button asChild>
-                    <Link to="/providers/perplexity">Open</Link>
-                  </Button>
-                </div>
-              </div>
-              <div className="rounded-xl border bg-card p-5">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="font-medium">Notion</div>
-                    <div className="text-sm text-muted-foreground">Set up your Notion credentials</div>
-                  </div>
-                  <Button asChild>
-                    <Link to="/providers/notion">Open</Link>
-                  </Button>
-                </div>
+        <div className="grid gap-5 md:grid-cols-[1.618fr_1fr]">
+          {/* Left: Hero + Chat */}
+          <section data-testid="golden-left" className="space-y-5">
+            <div>
+              <div className="mx-auto max-w-3xl text-center">
+                <h1 className="text-3xl md:text-4xl font-semibold tracking-tight">
+                  Welcome back — let’s ship smarter
+                </h1>
+                <p className="mt-3 text-muted-foreground">
+                  Search ready‑made prompts, preview the response, then hop into
+                  the full chat when you’re ready.
+                </p>
               </div>
             </div>
-          </div>
-        </section>
 
-        {/* About preview on home */}
-        <section className="mt-12">
-          <div className="mx-auto max-w-5xl">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold">About</h2>
-              <Button variant="link" asChild>
-                <Link to="/about">View full page</Link>
-              </Button>
-            </div>
-            <div className="">
-              <AboutContent compact />
-            </div>
-          </div>
-        </section>
+            <section
+              className={cn(
+                "rounded-3xl border bg-card/60 backdrop-blur ring-1 ring-border",
+                "p-6 md:p-8 shadow-sm",
+              )}
+              aria-labelledby="chat-section-title"
+            >
+              <div className="max-w-3xl mx-auto w-full">
+                <QuerySearch
+                  queries={deterministicQueries}
+                  onSelect={(t) => setPendingPrompt(t)}
+                  className="mb-4"
+                />
+              </div>
+              <div className="rounded-3xl border bg-background/80 shadow-md">
+                <ChatArea
+                  conversation={active}
+                  siblingConversations={siblings}
+                  onSend={onSend}
+                  onBranchFrom={onBranchFrom}
+                  onSwitchConversation={(id) => setActiveId(id)}
+                  onCloseConversation={(id) =>
+                    setConversations((prev) => prev.filter((c) => c.id !== id))
+                  }
+                  initialPrompt={pendingPrompt}
+                />
+              </div>
+            </section>
+          </section>
+
+          {/* Right: Context */}
+          <aside
+            data-testid="golden-right"
+            className="space-y-5 md:max-h-[calc(100vh-12rem)] md:overflow-auto"
+            aria-label="Context"
+          >
+            <section>
+              <div className="mx-auto max-w-5xl">
+                <h2 className="text-lg font-semibold mb-4">
+                  Connect to provider
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="rounded-xl border bg-card p-5">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="font-medium">Perplexity</div>
+                        <div className="text-sm text-muted-foreground">
+                          Set up your Perplexity credentials
+                        </div>
+                      </div>
+                      <Button asChild>
+                        <Link to="/providers/perplexity">Open</Link>
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="rounded-xl border bg-card p-5">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="font-medium">Notion</div>
+                        <div className="text-sm text-muted-foreground">
+                          Set up your Notion credentials
+                        </div>
+                      </div>
+                      <Button asChild>
+                        <Link to="/providers/notion">Open</Link>
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section>
+              <div className="mx-auto max-w-5xl">
+                <div className="mb-4 flex items-center justify-between">
+                  <h2 className="text-lg font-semibold">About</h2>
+                  <Button variant="link" asChild>
+                    <Link to="/about">View full page</Link>
+                  </Button>
+                </div>
+                <div>
+                  <AboutContent compact />
+                </div>
+              </div>
+            </section>
+          </aside>
+        </div>
       </main>
     </div>
   );
