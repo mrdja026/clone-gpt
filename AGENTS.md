@@ -214,12 +214,6 @@ Behave like my second brain. Work through the problem until you’d naturally st
 
   ## Upstash Agent
 
-The project includes a helper script for interacting with Upstash Redis.
-
-- Location: `scripts/upstash`
-- Requires: `python3` for URL encoding
-- Uses: `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` environment variables
-
 ### Commands
 
 - Use this to fetch data when debuging for fails and development
@@ -227,3 +221,5 @@ The project includes a helper script for interacting with Upstash Redis.
   ```bash
   ./scripts/upstash get <key>
   ```
+
+# VERY IMPORTANT DO NOT USE EMOJIES ANYWHER
