@@ -295,22 +295,62 @@ export class McpService {
 
   private async callRpc<T = any>(method: string, params?: any): Promise<T> {
     const base = this.getMcpBaseUrl();
-    const useFixtures =
-      process.env.MCP_USE_FIXTURES === "true" ||
-      process.env.MCP_USE_FIXTURES === "1";
+    const forwardOnly =
+      process.env.MCP_FORWARD_ONLY !== "0" &&
+      process.env.MCP_FORWARD_ONLY !== "false";
 
-    // 1) If an HTTP MCP is configured, use it exclusively
+    // Forward-only mode: require external MCP
+    if (forwardOnly) {
+      if (!base) {
+        throw new Error(
+          "MCP is in forward-only mode but MCP_BASE_URL is not configured. " +
+            "Set MCP_BASE_URL to point to an external MCP server, or set MCP_FORWARD_ONLY=0 for development.",
+        );
+      }
+
+      const url = `${base.replace(/\/$/, "")}/mcp`;
+      try {
+        const res = await axios.post(
+          url,
+          { jsonrpc: "2.0", id: Date.now(), method, params },
+          { timeout: 65000 },
+        );
+
+        // Handle JSON-RPC response format
+        if (res.data.error) {
+          throw new Error(
+            `MCP Error: ${res.data.error.message || res.data.error}`,
+          );
+        }
+
+        return res.data.result || (res.data as T);
+      } catch (error: any) {
+        if (error.code === "ECONNREFUSED" || error.code === "ENOTFOUND") {
+          throw new Error(
+            `Cannot connect to MCP server at ${url}. ` +
+              `Ensure the MCP server is running and accessible.`,
+          );
+        }
+        throw error;
+      }
+    }
+
+    // Legacy mode (development only): try HTTP first, then built-ins/fixtures
     if (base) {
       const url = `${base.replace(/\/$/, "")}/mcp`;
       const res = await axios.post(
         url,
-        { jsonrpc: "2.0", id: method, method, params },
+        { jsonrpc: "2.0", id: Date.now(), method, params },
         { timeout: 65000 },
       );
-      return res.data as T;
+      return res.data.result || (res.data as T);
     }
 
-    // 2) If fixtures are enabled, serve via internal fixtures
+    // Built-in adapters (development only when MCP_FORWARD_ONLY=0)
+    const useFixtures =
+      process.env.MCP_USE_FIXTURES === "true" ||
+      process.env.MCP_USE_FIXTURES === "1";
+
     if (useFixtures) {
       if (method === "listTools") {
         return {
