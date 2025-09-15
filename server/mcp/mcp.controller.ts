@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Inject } from "@nestjs/common";
+import { Body, Controller, Get, Post, Inject, Headers } from "@nestjs/common";
 import { McpService } from "./mcp.service";
 
 @Controller("mcp")
@@ -23,8 +23,13 @@ export class McpController {
   @Post("tool")
   async callTool(
     @Body() body: { name: string; arguments: Record<string, any> },
+    @Headers() headers: Record<string, string>,
   ) {
-    return this.mcpService.callTool(body.name, body.arguments);
+    // Extract Perplexity API key from headers or environment
+    const perplexityKey =
+      headers["x-perplexity-key"] || process.env.PERPLEXITY_API_KEY;
+
+    return this.mcpService.callTool(body.name, body.arguments, perplexityKey);
   }
 
   @Post("resource")

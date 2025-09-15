@@ -62,9 +62,204 @@ The application will be available at `http://localhost:8080`
 
 ## Testing
 
+### End-to-End Tests
+
 - Run e2e (auto-starts dev with fixtures): `pnpm test:e2e`
 - Or run against an already started dev server: `pnpm dev:fixtures` then `pnpm test:e2e:noserver`
 - Specs live in `e2e/`, config in `playwright.config.ts`. Current suite is passing using fixtures.
+
+### Perplexity Integration Tests
+
+**PowerShell (Windows):**
+
+```powershell
+# Comprehensive integration test
+./test-perplexity-integration.ps1
+
+# With explicit API key
+./test-perplexity-integration.ps1 -PerplexityKey "pplx-your-key" -Verbose
+
+# Quick validation
+./test-perplexity-integration.ps1 -SkipMcpServerCheck
+```
+
+**Bash (Unix/Linux/macOS):**
+
+```bash
+# Quick validation script
+./scripts/test-perplexity.sh
+
+# With explicit API key
+PERPLEXITY_API_KEY="pplx-your-key" ./scripts/test-perplexity.sh
+```
+
+**Manual Testing Commands:**
+
+```bash
+# 1. Start MCP server with Perplexity enabled
+cd ../hello-world-mcp
+MCP_HTTP_PORT=4000 PERPLEXITY_API_KEY=pplx-your-key node src/server.js
+
+# 2. Start clone-gpt in forward-only mode
+cd ../clone-gpt
+export MCP_FORWARD_ONLY=1
+export MCP_BASE_URL=http://127.0.0.1:4000
+pnpm dev
+
+# 3. Test tool listing
+curl -s http://localhost:8080/api/mcp/tools | jq '.tools[] | select(.name == "fetch_perplexity_data")'
+
+# 4. Test Perplexity search with header auth
+curl -s -X POST http://localhost:8080/api/mcp/tool \
+  -H 'Content-Type: application/json' \
+  -H "X-Perplexity-Key: pplx-your-key" \
+  -d '{"name":"fetch_perplexity_data","arguments":{"query":"what is the golden ratio?", "max_results":3}}' | jq
+
+# 5. Test cache behavior (run twice)
+curl -s -X POST http://localhost:8080/api/mcp/tool \
+  -H 'Content-Type: application/json' \
+  -H "X-Perplexity-Key: pplx-your-key" \
+  -d '{"name":"fetch_perplexity_data","arguments":{"query":"TypeScript best practices", "recency":"week"}}' | jq '.content[0].text | fromjson | .cache_hit'
+
+# 6. Test without API key (should fail gracefully)
+curl -s -X POST http://localhost:8080/api/mcp/tool \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"fetch_perplexity_data","arguments":{"query":"test"}}' | jq
+```
+
+### Troubleshooting Test Scenario
+
+**Common Issues and Solutions:**
+
+**Issue 1: "Unknown tool: fetch_perplexity_data"**
+
+```powershell
+# Problem: Old MCP server running without Perplexity support
+# Solution: Verify correct server is running
+
+# 1. Check if Perplexity tool exists
+$tools = Invoke-RestMethod -Uri "http://127.0.0.1:4000/mcp" -Method POST -ContentType "application/json" -Body '{"jsonrpc":"2.0","id":1,"method":"listTools","params":{}}'
+$tools.result.tools | Where-Object {$_.name -eq "fetch_perplexity_data"}
+
+# 2. If missing, kill old server and restart with updated code
+Get-Process | Where-Object {$_.ProcessName -eq "node"} | Stop-Process -Force
+cd ../hello-world-mcp
+$env:MCP_HTTP_PORT='4001'  # Use different port if 4000 is stuck
+$env:PERPLEXITY_API_KEY='pplx-your-key'
+$env:MCP_ENABLE_PERPLEXITY='1'
+node src/server.js
+
+# 3. Update clone-gpt to use new port
+cd ../clone-gpt
+$env:MCP_BASE_URL='http://127.0.0.1:4001'  # Match new port
+pnpm dev
+```
+
+**Issue 2: Ollama Connection Errors**
+
+```powershell
+# Problem: WSL proxy cannot connect to Windows Ollama
+# Solution: Check Ollama status and proxy configuration
+
+# 1. Verify Ollama is running on Windows
+curl http://127.0.0.1:11434/v1/models
+
+# 2. Check clone-gpt proxy status
+Invoke-RestMethod -Uri "http://localhost:3001/api/healthz" | Select-Object ollamaProxy
+
+# 3. If proxy issues, restart clone-gpt or use direct Windows IP
+$env:OPENAI_BASE_URL='http://192.168.128.1:11434/v1'  # Direct Windows host
+```
+
+**Issue 3: PowerShell Pipeline Errors**
+
+```powershell
+# Problem: Cannot pipe Node.js output to 'cat' in PowerShell
+# Solution: Use native PowerShell commands or redirect output
+
+# Instead of: node src/server.js | cat
+# Use: node src/server.js | Out-Host
+# Or: node src/server.js > server.log 2>&1
+```
+
+**Issue 4: Port Conflicts**
+
+```powershell
+# Check what's using port 4000
+netstat -ano | findstr :4000
+
+# Find and kill process if needed
+$processId = (Get-NetTCPConnection -LocalPort 4000).OwningProcess
+Stop-Process -Id $processId -Force
+
+# Or use alternative port
+$env:MCP_HTTP_PORT='4001'
+```
+
+**Issue 5: Environment Variable Persistence**
+
+```powershell
+# Problem: Environment variables not persisting between commands
+# Solution: Set all variables before starting services
+
+# Set multiple variables at once
+$env:MCP_FORWARD_ONLY='1'; $env:MCP_BASE_URL='http://127.0.0.1:4001'; $env:PERPLEXITY_API_KEY='pplx-your-key'
+
+# Or use .env file for persistence
+echo "MCP_BASE_URL=http://127.0.0.1:4001" >> .env
+echo "PERPLEXITY_API_KEY=pplx-your-key" >> .env
+```
+
+**Validation Commands (Copy-Paste Ready):**
+
+```powershell
+# Quick health check sequence
+Write-Host "Testing MCP server health..."
+try { $health = Invoke-RestMethod -Uri "http://127.0.0.1:4001/health"; Write-Host "✅ MCP server: OK" } catch { Write-Host "❌ MCP server: Failed" }
+
+Write-Host "Testing clone-gpt API..."
+try { $ping = Invoke-RestMethod -Uri "http://localhost:8080/api/ping"; Write-Host "✅ Clone-GPT: OK" } catch { Write-Host "❌ Clone-GPT: Failed" }
+
+Write-Host "Testing Perplexity tool availability..."
+try {
+    $tools = Invoke-RestMethod -Uri "http://localhost:8080/api/mcp/tools"
+    $perplexityTool = $tools.tools | Where-Object {$_.name -eq "fetch_perplexity_data"}
+    if ($perplexityTool) { Write-Host "✅ Perplexity tool: Available" } else { Write-Host "❌ Perplexity tool: Missing" }
+} catch { Write-Host "❌ Tool listing: Failed" }
+```
+
+**Log Monitoring:**
+
+```powershell
+# Monitor MCP server logs for errors
+# Look for these SUCCESS indicators:
+# ✅ "[BRIDGE] MCP HTTP bridge running on http://127.0.0.1:4001"
+# ✅ "[BRIDGE] tools/call completed in Xms"
+# ✅ "[MCP] Tool called: fetch_perplexity_data"
+
+# Look for these ERROR indicators:
+# ❌ "Unknown tool: fetch_perplexity_data"
+# ❌ "Child process exited"
+# ❌ "MCP error -32601"
+# ❌ "connect ECONNREFUSED"
+```
+
+**UI Testing Workflow:**
+
+```powershell
+# 1. Open browser to http://localhost:8080
+# 2. Type search queries like:
+#    - "What is the latest React version?"
+#    - "How to implement authentication in Node.js?"
+#    - "Explain TypeScript generics with examples"
+# 3. Expected behavior:
+#    ✅ Shows "🔍 Fetching data from JIRA..." briefly
+#    ✅ Displays "Search Results for..." section with sources
+#    ✅ Shows "Analysis:" section with AI response
+# 4. Check browser console (F12) for errors
+#    ✅ No 400/500 errors on /api/mcp/tool calls
+#    ✅ No network errors or timeouts
+```
 
 ## MCP (Model Context Protocol) Integration
 
@@ -89,6 +284,7 @@ MCP exposes tools and resources for deterministic queries. This app uses a **for
 ```powershell
 cd ../hello-world-mcp
 $env:MCP_HTTP_PORT='4000'
+$env:PERPLEXITY_API_KEY='pplx-your-api-key-here'  # Optional: for Perplexity searches
 node src/server.js
 # Should show: "MCP HTTP server running on http://127.0.0.1:4000"
 ```
@@ -99,6 +295,7 @@ node src/server.js
 MCP_FORWARD_ONLY=1
 MCP_BASE_URL=http://127.0.0.1:4000
 MODEL_NAME=qwen2
+PERPLEXITY_API_KEY=pplx-your-api-key-here  # Optional: fallback for Perplexity
 ```
 
 **3. Start clone-gpt:**
@@ -117,6 +314,10 @@ Invoke-WebRequest -Uri http://localhost:8080/api/mcp/tools -UseBasicParsing
 # Execute add_numbers tool
 $body = '{"name":"add_numbers","arguments":{"numbers":[1,2,3,4,5]}}'
 Invoke-WebRequest -Uri http://localhost:8080/api/mcp/tool -Method POST -Body $body -ContentType "application/json" -UseBasicParsing
+
+# Test Perplexity search (with API key)
+$body = '{"name":"fetch_perplexity_data","arguments":{"query":"what is the golden ratio?","recency":"month","max_results":3}}'
+Invoke-WebRequest -Uri http://localhost:8080/api/mcp/tool -Method POST -Body $body -ContentType "application/json" -Headers @{"X-Perplexity-Key"="pplx-your-api-key-here"} -UseBasicParsing
 ```
 
 ### Legacy verification (with built-in adapters):
@@ -493,6 +694,92 @@ The system automatically handles these query patterns:
 5. **Sprint Planning**
    - `"Create a 2-week sprint plan for team TEAM-A"`
    - Executes: `fetch_current_sprint` tool
+
+6. **Perplexity Search Queries**
+   - `"What is the latest React version?"`
+   - `"How to implement authentication in Node.js?"`
+   - `"Explain TypeScript generics with examples"`
+   - `"Latest JavaScript features this week"`
+   - Executes: `fetch_perplexity_data` tool with intelligent domain and recency filtering
+
+## Perplexity AI Integration
+
+The application includes comprehensive Perplexity AI search capabilities for real-time information retrieval.
+
+### Features
+
+- **Intelligent Query Detection**: Automatically detects search intent patterns
+- **Domain-Specific Filtering**: Smart domain detection for focused searches (GitHub, Stack Overflow, docs, etc.)
+- **Recency Filtering**: Automatic time-based filtering (day, week, month, year)
+- **Secure Authentication**: Per-request API key handling via headers
+- **Response Caching**: 1-hour TTL cache to reduce API calls and improve performance
+- **Structured Results**: Citations, sources, and formatted content for easy consumption
+
+### Authentication Methods
+
+1. **Per-Request Header (Recommended)**:
+
+   ```bash
+   curl -X POST http://localhost:8080/api/mcp/tool \
+     -H "Content-Type: application/json" \
+     -H "X-Perplexity-Key: pplx-your-api-key-here" \
+     -d '{"name":"fetch_perplexity_data","arguments":{"query":"React Router v6 best practices"}}'
+   ```
+
+2. **Environment Variable (Fallback)**:
+   ```bash
+   # In hello-world-mcp/.env or clone-gpt/.env
+   PERPLEXITY_API_KEY=pplx-your-api-key-here
+   ```
+
+### Query Examples
+
+The system automatically routes these query types to Perplexity:
+
+```bash
+# Development queries
+"How to use React hooks effectively?"
+"Latest TypeScript features 2024"
+"Best practices for Node.js authentication"
+
+# Research queries
+"What is machine learning explainability?"
+"Recent developments in quantum computing"
+"Compare GraphQL vs REST APIs"
+
+# Documentation searches
+"AWS Lambda deployment guide"
+"Docker compose examples"
+"Git workflow best practices"
+```
+
+### Response Format
+
+Perplexity responses include:
+
+- **Content**: Comprehensive answer from Perplexity
+- **Sources**: Up to 5 relevant sources with URLs
+- **Citations**: Key citations for fact-checking
+- **Metadata**: Query details, caching info, and timestamps
+
+Example response structure:
+
+```json
+{
+  "search_metadata": {
+    "query": "React Router v6 nested routes",
+    "timestamp": "2024-01-15T10:30:00Z",
+    "recency_filter": "month"
+  },
+  "content": "React Router v6 introduces several improvements...",
+  "sources": [
+    { "name": "React Router Docs", "url": "https://reactrouter.com/..." },
+    { "name": "Stack Overflow", "url": "https://stackoverflow.com/..." }
+  ],
+  "citations": ["React Router v6 documentation", "Community examples"],
+  "cache_hit": false
+}
+```
 
 ## Setup and Configuration
 
