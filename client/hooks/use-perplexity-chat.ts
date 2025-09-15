@@ -35,6 +35,48 @@ export function usePerplexityChat() {
 
       setIsLoading(true);
 
+      // Check for SEARCH SPACE RAG trigger phrase
+      const spaceSearchMatch = text
+        .trim()
+        .match(/^\s*search\s+space\s+rag\s*(.*)$/i);
+      let isSpaceSearch = false;
+      let actualQuery = text.trim();
+      let toolName = "perplexity_search";
+      let toolArgs: any = {
+        query: actualQuery,
+        temperature: 0.7,
+        max_tokens: 2000,
+      };
+
+      if (spaceSearchMatch) {
+        isSpaceSearch = true;
+        actualQuery = spaceSearchMatch[1].trim();
+
+        if (!actualQuery) {
+          // Show help message if no query provided
+          const helpMessage: Message = {
+            id: generateId(),
+            role: "assistant",
+            content:
+              "Please provide a question after 'SEARCH SPACE RAG'. Example: 'SEARCH SPACE RAG What are the best vector databases for RAG?'",
+            createdAt: Date.now(),
+          };
+
+          setConversation((prev) => ({
+            ...prev,
+            messages: [...prev.messages, helpMessage],
+          }));
+          setIsLoading(false);
+          return;
+        }
+
+        toolName = "perplexity_space_search";
+        toolArgs = {
+          query: actualQuery,
+          strict_mode: false, // Allow supplemental sources by default
+        };
+      }
+
       // Add user message
       const userMessage: Message = {
         id: generateId(),
@@ -49,22 +91,40 @@ export function usePerplexityChat() {
       }));
 
       try {
-        // Call Perplexity tool via MCP
-        const response = await mcpClient.callTool("perplexity_search", {
-          query: text.trim(),
-          temperature: 0.7,
-          max_tokens: 2000,
-        });
+        // Call appropriate Perplexity tool via MCP
+        const response = await mcpClient.callTool(toolName, toolArgs);
 
         // Parse the response content
         const contentText =
           response.content?.[0]?.text || "No response received";
         let responseContent = contentText;
+        let spaceMetadata = null;
 
         // Try to parse and extract the assistant's message from the API response
         try {
           const parsed = JSON.parse(contentText);
-          if (parsed.choices?.[0]?.message?.content) {
+
+          // Handle space search responses with metadata
+          if (isSpaceSearch && parsed.space_metadata) {
+            spaceMetadata = parsed.space_metadata;
+
+            // Extract the actual response content
+            if (parsed.choices?.[0]?.message?.content) {
+              responseContent = parsed.choices[0].message.content;
+
+              // Add space search context
+              let spaceInfo = `\n\n---\n**RAG Space Search Results:**\n`;
+              spaceInfo += `• Sources from RAG space: ${spaceMetadata.space_sources}/${spaceMetadata.total_sources} (${spaceMetadata.space_coverage})\n`;
+
+              if (parsed.warnings && parsed.warnings.length > 0) {
+                spaceInfo += `• Notes: ${parsed.warnings.join("; ")}\n`;
+              }
+
+              responseContent += spaceInfo;
+            } else if (parsed.error) {
+              responseContent = `Error: ${parsed.error}${parsed.message ? ` - ${parsed.message}` : ""}`;
+            }
+          } else if (parsed.choices?.[0]?.message?.content) {
             responseContent = parsed.choices[0].message.content;
           } else if (parsed.error) {
             responseContent = `Error: ${parsed.error}${parsed.message ? ` - ${parsed.message}` : ""}`;

@@ -7,7 +7,11 @@ import fs from "fs";
 import type { AxiosRequestConfig } from "axios";
 import {
   executePerplexitySearch,
+  executePerplexityDataFetch,
+  executePerplexitySpaceSearch,
   getPerplexityHistoryFiltered,
+  getSearchHistoryFormatted,
+  perplexityDataFetcherSchema,
 } from "./tools/perplexity.js";
 
 @Injectable()
@@ -399,6 +403,65 @@ export class McpService {
                 $schema: "http://json-schema.org/draft-07/schema#",
               },
             },
+            {
+              name: "perplexity_space_search",
+              title: "Perplexity Space Search",
+              description:
+                "Search within a specific Perplexity RAG Space for scoped results",
+              inputSchema: {
+                type: "object",
+                properties: {
+                  query: { type: "string", description: "The search query" },
+                  strict_mode: {
+                    type: "boolean",
+                    description:
+                      "Only return sources from the RAG space (optional)",
+                  },
+                },
+                required: ["query"],
+                additionalProperties: false,
+                $schema: "http://json-schema.org/draft-07/schema#",
+              },
+            },
+            {
+              name: "fetch_perplexity_data",
+              title: "Fetch Perplexity Data",
+              description:
+                "Fetch data using Perplexity AI optimized for local LLM processing",
+              inputSchema: {
+                type: "object",
+                properties: {
+                  query: {
+                    type: "string",
+                    description: "The search query",
+                  },
+                  recency: {
+                    type: "string",
+                    enum: ["day", "week", "month", "year"],
+                    description: "Filter results by recency (optional)",
+                  },
+                  domain: {
+                    type: "string",
+                    description: "Prioritize specific domain (optional)",
+                  },
+                  return_citations: {
+                    type: "boolean",
+                    description: "Include citations in response (optional)",
+                  },
+                  return_sources: {
+                    type: "boolean",
+                    description: "Include sources in response (optional)",
+                  },
+                  max_results: {
+                    type: "number",
+                    description: "Maximum number of results (optional)",
+                  },
+                },
+                required: ["query"],
+                additionalProperties: false,
+                $schema: "http://json-schema.org/draft-07/schema#",
+              },
+            },
           ],
         } as unknown as T;
       }
@@ -424,6 +487,26 @@ export class McpService {
               uri: "perplexity://history/last/10",
               name: "Recent Perplexity Searches",
               description: "Last 10 Perplexity searches",
+            },
+            {
+              uri: "search://history/",
+              name: "Search History",
+              description: "All search history (both types)",
+            },
+            {
+              uri: "search://history/recent/10",
+              name: "Recent Searches",
+              description: "Last 10 searches",
+            },
+            {
+              uri: "search://history/since/1640995200000",
+              name: "Recent Search History",
+              description: "Searches since timestamp",
+            },
+            {
+              uri: "search://history/query/optimization",
+              name: "Query-filtered History",
+              description: "Searches containing specific terms",
             },
           ],
         } as unknown as T;
@@ -474,6 +557,44 @@ export class McpService {
             } as unknown as T;
           }
         }
+        if (name === "perplexity_space_search") {
+          try {
+            const result = await executePerplexitySpaceSearch(args);
+            return result as unknown as T;
+          } catch (e: any) {
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: JSON.stringify({
+                    error: "Failed to execute Perplexity space search",
+                    message: e?.message || "Unknown error",
+                  }),
+                },
+              ],
+              isError: true,
+            } as unknown as T;
+          }
+        }
+        if (name === "fetch_perplexity_data") {
+          try {
+            const result = await executePerplexityDataFetch(args);
+            return result as unknown as T;
+          } catch (e: any) {
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: JSON.stringify({
+                    error: "Failed to fetch Perplexity data",
+                    message: e?.message || "Unknown error",
+                  }),
+                },
+              ],
+              isError: true,
+            } as unknown as T;
+          }
+        }
         throw new Error(`Unknown tool: ${name}`);
       }
       if (method === "readResource") {
@@ -494,6 +615,14 @@ export class McpService {
           const items = getPerplexityHistoryFiltered(uri);
           return {
             contents: [{ type: "text", text: JSON.stringify(items, null, 2) }],
+          } as unknown as T;
+        }
+        if (uri.startsWith("search://history/")) {
+          const contextData = getSearchHistoryFormatted(uri);
+          return {
+            contents: [
+              { type: "text", text: JSON.stringify(contextData, null, 2) },
+            ],
           } as unknown as T;
         }
         throw new Error(`Unknown resource: ${uri}`);
@@ -591,6 +720,65 @@ export class McpService {
               $schema: "http://json-schema.org/draft-07/schema#",
             },
           },
+          {
+            name: "perplexity_space_search",
+            title: "Perplexity Space Search",
+            description:
+              "Search within a specific Perplexity RAG Space for scoped results",
+            inputSchema: {
+              type: "object",
+              properties: {
+                query: { type: "string", description: "The search query" },
+                strict_mode: {
+                  type: "boolean",
+                  description:
+                    "Only return sources from the RAG space (optional)",
+                },
+              },
+              required: ["query"],
+              additionalProperties: false,
+              $schema: "http://json-schema.org/draft-07/schema#",
+            },
+          },
+          {
+            name: "fetch_perplexity_data",
+            title: "Fetch Perplexity Data",
+            description:
+              "Fetch data using Perplexity AI optimized for local LLM processing",
+            inputSchema: {
+              type: "object",
+              properties: {
+                query: {
+                  type: "string",
+                  description: "The search query",
+                },
+                recency: {
+                  type: "string",
+                  enum: ["day", "week", "month", "year"],
+                  description: "Filter results by recency (optional)",
+                },
+                domain: {
+                  type: "string",
+                  description: "Prioritize specific domain (optional)",
+                },
+                return_citations: {
+                  type: "boolean",
+                  description: "Include citations in response (optional)",
+                },
+                return_sources: {
+                  type: "boolean",
+                  description: "Include sources in response (optional)",
+                },
+                max_results: {
+                  type: "number",
+                  description: "Maximum number of results (optional)",
+                },
+              },
+              required: ["query"],
+              additionalProperties: false,
+              $schema: "http://json-schema.org/draft-07/schema#",
+            },
+          },
         ],
       } as unknown as T;
     }
@@ -611,6 +799,26 @@ export class McpService {
             uri: "perplexity://history/last/10",
             name: "Recent Perplexity Searches",
             description: "Last 10 Perplexity searches",
+          },
+          {
+            uri: "search://history/",
+            name: "Search History",
+            description: "All search history (both types)",
+          },
+          {
+            uri: "search://history/recent/10",
+            name: "Recent Searches",
+            description: "Last 10 searches",
+          },
+          {
+            uri: "search://history/since/1640995200000",
+            name: "Recent Search History",
+            description: "Searches since timestamp",
+          },
+          {
+            uri: "search://history/query/optimization",
+            name: "Query-filtered History",
+            description: "Searches containing specific terms",
           },
         ],
       } as unknown as T;
@@ -718,6 +926,44 @@ export class McpService {
           } as unknown as T;
         }
       }
+      if (name === "perplexity_space_search") {
+        try {
+          const result = await executePerplexitySpaceSearch(args);
+          return result as unknown as T;
+        } catch (e: any) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify({
+                  error: "Failed to execute Perplexity space search",
+                  message: e?.message || "Unknown error",
+                }),
+              },
+            ],
+            isError: true,
+          } as unknown as T;
+        }
+      }
+      if (name === "fetch_perplexity_data") {
+        try {
+          const result = await executePerplexityDataFetch(args);
+          return result as unknown as T;
+        } catch (e: any) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify({
+                  error: "Failed to fetch Perplexity data",
+                  message: e?.message || "Unknown error",
+                }),
+              },
+            ],
+            isError: true,
+          } as unknown as T;
+        }
+      }
       throw new Error(`Unknown tool: ${name}`);
     }
     if (method === "readResource") {
@@ -783,6 +1029,28 @@ export class McpService {
                 uri,
                 text: JSON.stringify({
                   error: "Failed to get Perplexity history",
+                  message: e?.message || "Unknown error",
+                }),
+              },
+            ],
+          } as unknown as T;
+        }
+      }
+      if (uri.startsWith("search://history/")) {
+        try {
+          const contextData = getSearchHistoryFormatted(uri);
+          return {
+            contents: [
+              { type: "text", text: JSON.stringify(contextData, null, 2) },
+            ],
+          } as unknown as T;
+        } catch (e: any) {
+          return {
+            contents: [
+              {
+                uri,
+                text: JSON.stringify({
+                  error: "Failed to get search history",
                   message: e?.message || "Unknown error",
                 }),
               },

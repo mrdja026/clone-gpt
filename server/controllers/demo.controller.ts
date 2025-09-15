@@ -40,6 +40,8 @@ export class DemoController {
         JIRA_BOARD_ID: process.env.JIRA_BOARD_ID || "",
         JIRA_PROJECT_KEY: process.env.JIRA_PROJECT_KEY || "",
         PERPLEXITY_API_KEY: process.env.PERPLEXITY_API_KEY ? "set" : "",
+        PERPLEXITY_API_BASE: process.env.PERPLEXITY_API_BASE || "",
+        PERPLEXITY_MODEL: process.env.PERPLEXITY_MODEL || "",
       },
       effectiveBaseUrl: getEffectiveOllamaBaseUrl(),
       ollamaProxy: getOllamaProxyStatus(),
