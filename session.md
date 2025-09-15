@@ -331,3 +331,48 @@ Session logged at: 2025-09-14T20:28:29.971Z
 Session logged at: 2025-09-14T20:41:51.815Z
 
 Session logged at: 2025-09-14T22:31:40.879Z
+
+---
+
+## ✅ TASK 8 COMPLETION UPDATE (September 15, 2025)
+
+**MAJOR ARCHITECTURE CHANGE**: Successfully implemented forward-only MCP architecture with clean separation of concerns.
+
+### New State: Forward-Only MCP + Local LLM
+
+- **MCP**: External `hello-world-mcp` server (HTTP JSON-RPC on port 4000)
+- **LLM**: Local Qwen2 via Ollama (independent of MCP)
+- **Default**: `MCP_FORWARD_ONLY=1` in `.env`
+
+### Working Commands (Forward-Only Mode)
+
+```powershell
+# Start external MCP server
+cd ..\hello-world-mcp && $env:MCP_HTTP_PORT='4000' && node src/server.js
+
+# Start clone-gpt (auto-forwards to external MCP)
+cd clone-gpt && pnpm dev
+
+# Test integration
+Invoke-WebRequest -Uri http://localhost:8080/api/mcp/tools -UseBasicParsing
+```
+
+### Verified Working Features
+
+- ✅ MCP tools discovery via forward-only proxy
+- ✅ Tool execution through full chain: Browser → clone-gpt → hello-world-mcp
+- ✅ Local Qwen2 LLM chat (independent of MCP)
+- ✅ Error handling when external MCP is down
+- ✅ Dual transport: stdio (editors) + HTTP (web)
+
+### Key Benefits Achieved
+
+- **Clean separation**: Tools vs LLM
+- **No spawning**: External MCP runs independently
+- **Context7 compatible**: Standard JSON-RPC over HTTP
+- **Swappable**: Point MCP_BASE_URL to any MCP server
+- **Secure**: MCP secrets isolated externally
+
+**Status**: Production-ready forward-only MCP architecture operational. Legacy built-in adapters preserved under `MCP_FORWARD_ONLY=0` for development.
+
+Session logged at: 2025-09-15T18:55:00.000Z

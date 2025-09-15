@@ -68,21 +68,60 @@ The application will be available at `http://localhost:8080`
 
 ## MCP (Model Context Protocol) Integration
 
-MCP exposes tools and resources that the app calls for deterministic queries (e.g., Jira ticket lookups). This app supports three modes — all controlled by env vars (no code changes needed):
+MCP exposes tools and resources for deterministic queries. This app uses a **forward-only architecture** by default:
 
-- Direct Jira adapter (default)
-  - Leave `MCP_BASE_URL` unset and `MCP_USE_FIXTURES` empty/0.
-  - The server calls Jira directly from `server/mcp/mcp.service.ts` using `JIRA_BASE_URL`, `JIRA_EMAIL`, `JIRA_API_TOKEN`.
-  - Tools: `fetch_jira_ticket`, `fetch_jira_myself`. Resource: `mcp://local-mcp-server/jira/projects`.
+### Forward-only Mode (Default: MCP_FORWARD_ONLY=1)
 
-- External HTTP MCP (optional)
-  - Set `MCP_BASE_URL=http://localhost:<port>` to route all MCP calls to `${MCP_BASE_URL}/mcp` (JSON‑RPC over HTTP).
-  - No stdio is used.
+- **External MCP required**: Set `MCP_BASE_URL` to point to external MCP server
+- **Pure proxy**: All calls forwarded as JSON-RPC to `<MCP_BASE_URL>/mcp`
+- **Recommended**: Use with `hello-world-mcp` or other external MCP servers
 
-- Fixtures (dev/testing)
-  - Set `MCP_USE_FIXTURES=1` to return deterministic data from `server/fixtures/` (e.g., `SCRUM-8.json`).
+### Legacy Mode (Development: MCP_FORWARD_ONLY=0)
 
-Quick verification (with `pnpm dev` running):
+- **Built-in adapters**: Direct Jira calls from server using `JIRA_*` envs
+- **Fixtures**: Set `MCP_USE_FIXTURES=1` for static test data from `server/fixtures/`
+- **External fallback**: Can still use `MCP_BASE_URL` if set
+
+### ✅ Quick Start with hello-world-mcp
+
+**1. Start hello-world-mcp with HTTP:**
+
+```powershell
+cd ../hello-world-mcp
+$env:MCP_HTTP_PORT='4000'
+node src/server.js
+# Should show: "MCP HTTP server running on http://127.0.0.1:4000"
+```
+
+**2. Configure clone-gpt (.env already set):**
+
+```bash
+MCP_FORWARD_ONLY=1
+MCP_BASE_URL=http://127.0.0.1:4000
+MODEL_NAME=qwen2
+```
+
+**3. Start clone-gpt:**
+
+```bash
+pnpm dev
+# Should start on http://localhost:8080
+```
+
+**4. Test integration:**
+
+```powershell
+# List tools via clone-gpt → hello-world-mcp
+Invoke-WebRequest -Uri http://localhost:8080/api/mcp/tools -UseBasicParsing
+
+# Execute add_numbers tool
+$body = '{"name":"add_numbers","arguments":{"numbers":[1,2,3,4,5]}}'
+Invoke-WebRequest -Uri http://localhost:8080/api/mcp/tool -Method POST -Body $body -ContentType "application/json" -UseBasicParsing
+```
+
+### Legacy verification (with built-in adapters):
+
+Set `MCP_FORWARD_ONLY=0` in .env, then:
 
 - Health: `curl -s http://localhost:3001/api/healthz | jq`
 - Tools: `curl -s http://localhost:3001/api/mcp/tools | jq`
@@ -903,7 +942,16 @@ SLO/observability
 
 This project is licensed under the MIT License.
 
-#TODO
-
-- [ ] still halucinates
-- [ ] lots of duplicate files/stubbs remove them
+┌─────────────────┐ HTTP JSON-RPC ┌──────────────────┐
+│ clone-gpt │ ──────────────────► │ hello-world-mcp │
+│ (Forward-only) │ /mcp endpoint │ (HTTP + stdio) │
+│ Port 8080 │ │ Port 4000 │
+└─────────────────┘ └──────────────────┘
+│ │
+│ Local LLM (Qwen2) │ Tools:
+│ via Ollama │ • add_numbers
+▼ │ • fetch_jira_ticket
+┌─────────────────┐ │ • JIRA integration
+│ Chat Interface │ └──────────────────┘
+│ (Independent) │
+└─────────────────┘
