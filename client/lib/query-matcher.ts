@@ -86,6 +86,74 @@ function extractTeamNames(text: string): string[] {
 }
 
 /**
+ * Detect search intent patterns for Perplexity
+ */
+function isSearchQuery(text: string): boolean {
+  const searchKeywords = [
+    "search",
+    "find",
+    "look up",
+    "what is",
+    "how to",
+    "explain",
+    "define",
+    "latest",
+    "recent",
+    "news",
+    "trends",
+    "information about",
+    "learn about",
+    "compare",
+    "best practices",
+    "tutorial",
+    "guide",
+    "examples",
+  ];
+
+  const lowerText = text.toLowerCase();
+  return searchKeywords.some((keyword) => lowerText.includes(keyword));
+}
+
+/**
+ * Extract domain hints from search queries
+ */
+function extractSearchDomain(text: string): string | undefined {
+  const domainPatterns = [
+    { pattern: /\b(github|git|repository|repo)\b/i, domain: "github.com" },
+    {
+      pattern: /\b(stack overflow|stackoverflow)\b/i,
+      domain: "stackoverflow.com",
+    },
+    { pattern: /\b(documentation|docs|api)\b/i, domain: "docs" },
+    {
+      pattern: /\b(react|javascript|typescript|js|ts)\b/i,
+      domain: "developer.mozilla.org",
+    },
+    { pattern: /\b(python|django|flask)\b/i, domain: "python.org" },
+    { pattern: /\b(aws|amazon web services)\b/i, domain: "aws.amazon.com" },
+  ];
+
+  for (const { pattern, domain } of domainPatterns) {
+    if (pattern.test(text)) {
+      return domain;
+    }
+  }
+
+  return undefined;
+}
+
+/**
+ * Extract recency hints from search queries
+ */
+function extractSearchRecency(text: string): string {
+  if (/\b(today|latest|recent|new|current)\b/i.test(text)) return "day";
+  if (/\b(this week|weekly)\b/i.test(text)) return "week";
+  if (/\b(this month|monthly)\b/i.test(text)) return "month";
+  if (/\b(this year|yearly|annual)\b/i.test(text)) return "year";
+  return "month"; // default
+}
+
+/**
  * Match user query against deterministic patterns and generate MCP actions
  */
 export function matchQuery(userInput: string): QueryMatch {
@@ -352,6 +420,39 @@ export function matchQuery(userInput: string): QueryMatch {
     };
   }
 
+  // Pattern 8: Perplexity search queries - detect search intent
+  if (
+    isSearchQuery(input) &&
+    !input.includes("ticket") &&
+    !input.includes("project") &&
+    !input.includes("sprint")
+  ) {
+    const domain = extractSearchDomain(originalInput);
+    const recency = extractSearchRecency(originalInput);
+
+    return {
+      isMatch: true,
+      confidence: 0.85,
+      originalQuery: userInput,
+      mcpActions: [
+        {
+          toolName: "fetch_perplexity_data",
+          args: {
+            query: originalInput,
+            recency,
+            ...(domain && { domain }),
+            return_citations: true,
+            return_sources: true,
+            max_results: 5,
+          },
+          description: `Searching for: "${originalInput}"${domain ? ` (focused on ${domain})` : ""}`,
+          type: "tool",
+        },
+      ],
+      enhancedPrompt: `Based on the search results from Perplexity, provide a comprehensive answer to the user's query: "${originalInput}". Include relevant citations and sources from the search data.`,
+    };
+  }
+
   // Fallback: If any JIRA key appears anywhere in the input, fetch it
   {
     const jiraKeys = extractJiraKeys(originalInput);
@@ -366,8 +467,7 @@ export function matchQuery(userInput: string): QueryMatch {
           description: `Fetching details for JIRA ticket ${ticketKey}`,
           type: "tool",
         })),
-        enhancedPrompt:
-          `You are in strict analysis mode. Only use the 'Retrieved Data' below that comes from the MCP JIRA tool. If no data is present, reply: "No JIRA data found for ${jiraKeys[0]}". Do not infer or hallucinate.`,
+        enhancedPrompt: `You are in strict analysis mode. Only use the 'Retrieved Data' below that comes from the MCP JIRA tool. If no data is present, reply: "No JIRA data found for ${jiraKeys[0]}". Do not infer or hallucinate.`,
       };
     }
   }
@@ -436,6 +536,40 @@ ${data.activeSprints
 `;
         }
         return `**Sprint Summary:** ${data.summary || "No active sprints found"}`;
+
+      case "fetch_perplexity_data":
+        // Handle Perplexity search results
+        if (data.error) {
+          return `⚠️ **Search Error:** ${data.error}`;
+        }
+
+        const searchContent = data.content || "";
+        const citations = data.citations || [];
+        const sources = data.sources || [];
+        const metadata = data.search_metadata || {};
+
+        let formatted = `**Search Results**${metadata.query ? ` for "${metadata.query}"` : ""}:\n\n`;
+
+        if (searchContent) {
+          formatted += `${searchContent}\n\n`;
+        }
+
+        if (sources.length > 0) {
+          formatted += `**Sources:**\n`;
+          sources.slice(0, 5).forEach((source: any, index: number) => {
+            formatted += `${index + 1}. [${source.name || source.title || "Source"}](${source.url})\n`;
+          });
+          formatted += "\n";
+        }
+
+        if (citations.length > 0) {
+          formatted += `**Citations:**\n`;
+          citations.slice(0, 3).forEach((citation: string, index: number) => {
+            formatted += `${index + 1}. ${citation}\n`;
+          });
+        }
+
+        return formatted;
 
       default:
         return `**${action.description}:**\n\`\`\`json\n${JSON.stringify(data, null, 2)}\n\`\`\``;

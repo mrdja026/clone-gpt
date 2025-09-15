@@ -22,7 +22,11 @@ export class McpService {
     return forwardOnly !== "0" && forwardOnly !== "false";
   }
 
-  private async callRpc<T = any>(method: string, params?: any): Promise<T> {
+  private async callRpc<T = any>(
+    method: string,
+    params?: any,
+    headers?: Record<string, string>,
+  ): Promise<T> {
     const base = this.getMcpBaseUrl();
     const forwardOnly = this.isForwardOnlyMode();
 
@@ -37,10 +41,18 @@ export class McpService {
 
       const url = `${base.replace(/\/$/, "")}/mcp`;
       try {
+        const requestHeaders: Record<string, string> = {
+          "Content-Type": "application/json",
+          ...headers,
+        };
+
         const res = await axios.post(
           url,
           { jsonrpc: "2.0", id: Date.now(), method, params },
-          { timeout: 65000 },
+          {
+            timeout: 65000,
+            headers: requestHeaders,
+          },
         );
 
         // Handle JSON-RPC response format
@@ -77,8 +89,23 @@ export class McpService {
     return this.callRpc("listResources");
   }
 
-  async callTool(name: string, args: Record<string, any>) {
-    return this.callRpc("callTool", { name, arguments: args });
+  async callTool(
+    name: string,
+    args: Record<string, any>,
+    perplexityKey?: string,
+  ) {
+    const headers: Record<string, string> = {};
+
+    // Add Perplexity API key header if provided and tool is fetch_perplexity_data
+    if (perplexityKey && name === "fetch_perplexity_data") {
+      headers["X-Perplexity-Key"] = perplexityKey;
+    }
+
+    return this.callRpc(
+      "callTool",
+      { name, arguments: args },
+      Object.keys(headers).length > 0 ? headers : undefined,
+    );
   }
 
   async readResource(uri: string) {
