@@ -3,9 +3,9 @@ import type { QueryTemplate } from "@/components/chat/types";
 export const deterministicQueries: QueryTemplate[] = [
   {
     id: "q1",
-    label: "Get Jira issue ABC-123 details",
+    label: "Get Jira issue SCRUM-8 details",
     template:
-      "Show details for issue ABC-123 including status, assignee, and blockers.",
+      "Show details for issue SCRUM-8 including status, assignee, and blockers.",
   },
   {
     id: "q2",
