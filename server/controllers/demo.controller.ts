@@ -1,6 +1,10 @@
 import { Controller, Get } from "@nestjs/common";
 import type { DemoResponse } from "../../shared/api";
-import { getOllamaProxyStatus, getEffectiveOllamaBaseUrl } from "../utils/ollama-proxy";
+import {
+  getOllamaProxyStatus,
+  getEffectiveOllamaBaseUrl,
+} from "../utils/ollama-proxy";
+import { checkPerplexityHealth } from "../mcp/tools/perplexity.js";
 
 @Controller()
 export class DemoController {
@@ -19,9 +23,11 @@ export class DemoController {
   }
 
   @Get("healthz")
-  healthz() {
+  async healthz() {
     const port = process.env.PORT || "3001";
     const host = process.env.BIND_HOST || "0.0.0.0";
+    const perplexityHealth = await checkPerplexityHealth();
+
     return {
       status: "ok",
       port,
@@ -33,9 +39,11 @@ export class DemoController {
         MODEL_NAME: process.env.MODEL_NAME || "",
         JIRA_BOARD_ID: process.env.JIRA_BOARD_ID || "",
         JIRA_PROJECT_KEY: process.env.JIRA_PROJECT_KEY || "",
+        PERPLEXITY_API_KEY: process.env.PERPLEXITY_API_KEY ? "set" : "",
       },
       effectiveBaseUrl: getEffectiveOllamaBaseUrl(),
       ollamaProxy: getOllamaProxyStatus(),
+      perplexityApi: perplexityHealth,
       time: new Date().toISOString(),
     };
   }

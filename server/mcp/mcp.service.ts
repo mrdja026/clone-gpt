@@ -5,6 +5,10 @@ import { fileURLToPath } from "url";
 import { ConfigService } from "@nestjs/config";
 import fs from "fs";
 import type { AxiosRequestConfig } from "axios";
+import {
+  executePerplexitySearch,
+  getPerplexityHistoryFiltered,
+} from "./tools/perplexity.js";
 
 @Injectable()
 export class McpService {
@@ -24,7 +28,10 @@ export class McpService {
   private getMcpBaseUrl() {
     // Only use HTTP JSON-RPC when explicitly configured.
     // Otherwise, prefer built-in adapters or stdio without a spurious 404.
-    const explicit = this.configService.get<string>("MCP_BASE_URL") || process.env.MCP_BASE_URL || "";
+    const explicit =
+      this.configService.get<string>("MCP_BASE_URL") ||
+      process.env.MCP_BASE_URL ||
+      "";
     return explicit.trim();
   }
 
@@ -55,7 +62,10 @@ export class McpService {
     } as Record<string, string>;
   }
 
-  private async jiraAgileGet<T = any>(pathname: string, config?: AxiosRequestConfig) {
+  private async jiraAgileGet<T = any>(
+    pathname: string,
+    config?: AxiosRequestConfig,
+  ) {
     const { baseUrl } = this.getJiraConfig();
     const headers = this.getJiraAuthHeaders();
     if (!baseUrl || !headers) {
@@ -72,7 +82,10 @@ export class McpService {
     return url.replace(/\/$/, "");
   }
 
-  private async jiraGet<T = any>(pathname: string, config?: AxiosRequestConfig) {
+  private async jiraGet<T = any>(
+    pathname: string,
+    config?: AxiosRequestConfig,
+  ) {
     const { baseUrl } = this.getJiraConfig();
     const headers = this.getJiraAuthHeaders();
     if (!baseUrl || !headers) {
@@ -92,7 +105,10 @@ export class McpService {
         process.env.MCP_USE_FIXTURES === "1" ||
         process.env.MCP_USE_FIXTURES === "true";
       if (useFixtures) {
-        const fromHere = path.resolve(this.getCurrentDirname(), "../../fixtures/jira");
+        const fromHere = path.resolve(
+          this.getCurrentDirname(),
+          "../../fixtures/jira",
+        );
         const fromCwd = path.resolve(process.cwd(), "server/fixtures/jira");
         const candidateDirs = [fromHere, fromCwd];
         for (const dir of candidateDirs) {
@@ -130,7 +146,8 @@ export class McpService {
           if (typeof node === "string") return node;
           const t = node.type || "";
           if (t === "text" && node.text) return node.text;
-          if (Array.isArray(node.content)) return node.content.map(walk).join("");
+          if (Array.isArray(node.content))
+            return node.content.map(walk).join("");
           return "";
         };
         description = walk(fields.description);
@@ -158,7 +175,10 @@ export class McpService {
         process.env.MCP_USE_FIXTURES === "1" ||
         process.env.MCP_USE_FIXTURES === "true";
       if (useFixtures) {
-        const fromHere = path.resolve(this.getCurrentDirname(), "../../fixtures/jira");
+        const fromHere = path.resolve(
+          this.getCurrentDirname(),
+          "../../fixtures/jira",
+        );
         const fromCwd = path.resolve(process.cwd(), "server/fixtures/jira");
         const candidateDirs = [fromHere, fromCwd];
         for (const dir of candidateDirs) {
@@ -172,9 +192,12 @@ export class McpService {
       }
     } catch (e) {
       // Fall through to real API
-      console.warn("[MCP] Fixture load failed; falling back to Jira API (myself)", {
-        message: (e as any)?.message,
-      });
+      console.warn(
+        "[MCP] Fixture load failed; falling back to Jira API (myself)",
+        {
+          message: (e as any)?.message,
+        },
+      );
     }
     return this.jiraGet<any>("/rest/api/3/myself");
   }
@@ -186,7 +209,10 @@ export class McpService {
         process.env.MCP_USE_FIXTURES === "1" ||
         process.env.MCP_USE_FIXTURES === "true";
       if (useFixtures) {
-        const fromHere = path.resolve(this.getCurrentDirname(), "../../fixtures/jira");
+        const fromHere = path.resolve(
+          this.getCurrentDirname(),
+          "../../fixtures/jira",
+        );
         const fromCwd = path.resolve(process.cwd(), "server/fixtures/jira");
         const candidateDirs = [fromHere, fromCwd];
         for (const dir of candidateDirs) {
@@ -221,7 +247,9 @@ export class McpService {
       }
 
       if (!useBoardId) {
-        throw new Error("Could not determine Jira board id. Set JIRA_BOARD_ID or JIRA_PROJECT_KEY.");
+        throw new Error(
+          "Could not determine Jira board id. Set JIRA_BOARD_ID or JIRA_PROJECT_KEY.",
+        );
       }
 
       const sprints = await this.jiraAgileGet<any>(
@@ -243,8 +271,8 @@ export class McpService {
       };
     } catch (e: any) {
       throw new Error(
-        `Failed to retrieve current sprint: ${e?.response?.status || ''} ${
-          e?.response?.data?.message || e?.message || 'Unknown error'
+        `Failed to retrieve current sprint: ${e?.response?.status || ""} ${
+          e?.response?.data?.message || e?.message || "Unknown error"
         }`,
       );
     }
@@ -261,11 +289,11 @@ export class McpService {
     }));
   }
 
-
   private async callRpc<T = any>(method: string, params?: any): Promise<T> {
     const base = this.getMcpBaseUrl();
     const useFixtures =
-      process.env.MCP_USE_FIXTURES === "true" || process.env.MCP_USE_FIXTURES === "1";
+      process.env.MCP_USE_FIXTURES === "true" ||
+      process.env.MCP_USE_FIXTURES === "1";
 
     // 1) If an HTTP MCP is configured, use it exclusively
     if (base) {
@@ -310,7 +338,8 @@ export class McpService {
             {
               name: "fetch_jira_myself",
               title: "Fetch Jira Myself",
-              description: "Fetch current Jira user profile to validate credentials",
+              description:
+                "Fetch current Jira user profile to validate credentials",
               inputSchema: {
                 type: "object",
                 properties: {},
@@ -321,10 +350,51 @@ export class McpService {
             {
               name: "get_current_sprint_summary",
               title: "Get Current Sprint Summary",
-              description: "Return the current sprint summary (fixtures-only by default)",
+              description:
+                "Return the current sprint summary (fixtures-only by default)",
               inputSchema: {
                 type: "object",
                 properties: {},
+                additionalProperties: false,
+                $schema: "http://json-schema.org/draft-07/schema#",
+              },
+            },
+            {
+              name: "perplexity_search",
+              title: "Perplexity Search",
+              description:
+                "Search the web using Perplexity AI with real-time information",
+              inputSchema: {
+                type: "object",
+                properties: {
+                  query: { type: "string", description: "The search query" },
+                  system: {
+                    type: "string",
+                    description: "System prompt (optional)",
+                  },
+                  recency: {
+                    type: "string",
+                    enum: ["day", "week", "month", "year"],
+                    description: "Filter results by recency (optional)",
+                  },
+                  max_tokens: {
+                    type: "number",
+                    description: "Maximum tokens in response (optional)",
+                  },
+                  temperature: {
+                    type: "number",
+                    description: "Response temperature 0-1 (optional)",
+                  },
+                  stream: {
+                    type: "boolean",
+                    description: "Stream response (optional)",
+                  },
+                  domain: {
+                    type: "string",
+                    description: "Prioritize specific domain (optional)",
+                  },
+                },
+                required: ["query"],
                 additionalProperties: false,
                 $schema: "http://json-schema.org/draft-07/schema#",
               },
@@ -344,6 +414,16 @@ export class McpService {
               uri: "mcp://local-mcp-server/jira/current-sprint",
               name: "Current Sprint",
               description: "Summary of the current active sprint",
+            },
+            {
+              uri: "perplexity://history/",
+              name: "Perplexity Search History",
+              description: "All Perplexity search history",
+            },
+            {
+              uri: "perplexity://history/last/10",
+              name: "Recent Perplexity Searches",
+              description: "Last 10 Perplexity searches",
             },
           ],
         } as unknown as T;
@@ -375,6 +455,25 @@ export class McpService {
             content: [{ type: "text", text: JSON.stringify(data) }],
           } as unknown as T;
         }
+        if (name === "perplexity_search") {
+          try {
+            const result = await executePerplexitySearch(args);
+            return result as unknown as T;
+          } catch (e: any) {
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: JSON.stringify({
+                    error: "Failed to execute Perplexity search",
+                    message: e?.message || "Unknown error",
+                  }),
+                },
+              ],
+              isError: true,
+            } as unknown as T;
+          }
+        }
         throw new Error(`Unknown tool: ${name}`);
       }
       if (method === "readResource") {
@@ -389,6 +488,12 @@ export class McpService {
           const summary = await this.fetchCurrentSprintSummary();
           return {
             contents: [{ uri, text: JSON.stringify(summary) }],
+          } as unknown as T;
+        }
+        if (uri.startsWith("perplexity://history/")) {
+          const items = getPerplexityHistoryFiltered(uri);
+          return {
+            contents: [{ type: "text", text: JSON.stringify(items, null, 2) }],
           } as unknown as T;
         }
         throw new Error(`Unknown resource: ${uri}`);
@@ -446,6 +551,46 @@ export class McpService {
               $schema: "http://json-schema.org/draft-07/schema#",
             },
           },
+          {
+            name: "perplexity_search",
+            title: "Perplexity Search",
+            description:
+              "Search the web using Perplexity AI with real-time information",
+            inputSchema: {
+              type: "object",
+              properties: {
+                query: { type: "string", description: "The search query" },
+                system: {
+                  type: "string",
+                  description: "System prompt (optional)",
+                },
+                recency: {
+                  type: "string",
+                  enum: ["day", "week", "month", "year"],
+                  description: "Filter results by recency (optional)",
+                },
+                max_tokens: {
+                  type: "number",
+                  description: "Maximum tokens in response (optional)",
+                },
+                temperature: {
+                  type: "number",
+                  description: "Response temperature 0-1 (optional)",
+                },
+                stream: {
+                  type: "boolean",
+                  description: "Stream response (optional)",
+                },
+                domain: {
+                  type: "string",
+                  description: "Prioritize specific domain (optional)",
+                },
+              },
+              required: ["query"],
+              additionalProperties: false,
+              $schema: "http://json-schema.org/draft-07/schema#",
+            },
+          },
         ],
       } as unknown as T;
     }
@@ -456,6 +601,16 @@ export class McpService {
             uri: "mcp://local-mcp-server/jira/projects",
             name: "Jira Projects",
             description: "List Jira projects",
+          },
+          {
+            uri: "perplexity://history/",
+            name: "Perplexity Search History",
+            description: "All Perplexity search history",
+          },
+          {
+            uri: "perplexity://history/last/10",
+            name: "Recent Perplexity Searches",
+            description: "Last 10 Perplexity searches",
           },
         ],
       } as unknown as T;
@@ -482,7 +637,10 @@ export class McpService {
                 type: "text",
                 text: JSON.stringify({
                   error: "Failed to fetch Jira ticket",
-                  message: e?.response?.data?.errorMessages?.[0] || e?.message || "Unknown error",
+                  message:
+                    e?.response?.data?.errorMessages?.[0] ||
+                    e?.message ||
+                    "Unknown error",
                   status: e?.response?.status || 500,
                 }),
               },
@@ -504,7 +662,10 @@ export class McpService {
                 type: "text",
                 text: JSON.stringify({
                   error: "Failed to fetch current sprint summary",
-                  message: e?.response?.data?.errorMessages?.[0] || e?.message || "Unknown error",
+                  message:
+                    e?.response?.data?.errorMessages?.[0] ||
+                    e?.message ||
+                    "Unknown error",
                   status: e?.response?.status || 500,
                 }),
               },
@@ -526,8 +687,30 @@ export class McpService {
                 type: "text",
                 text: JSON.stringify({
                   error: "Failed to fetch Jira myself",
-                  message: e?.response?.data?.errorMessages?.[0] || e?.message || "Unknown error",
+                  message:
+                    e?.response?.data?.errorMessages?.[0] ||
+                    e?.message ||
+                    "Unknown error",
                   status: e?.response?.status || 500,
+                }),
+              },
+            ],
+            isError: true,
+          } as unknown as T;
+        }
+      }
+      if (name === "perplexity_search") {
+        try {
+          const result = await executePerplexitySearch(args);
+          return result as unknown as T;
+        } catch (e: any) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify({
+                  error: "Failed to execute Perplexity search",
+                  message: e?.message || "Unknown error",
                 }),
               },
             ],
@@ -552,7 +735,10 @@ export class McpService {
                 uri,
                 text: JSON.stringify({
                   error: "Failed to list projects",
-                  message: e?.response?.data?.errorMessages?.[0] || e?.message || "Unknown error",
+                  message:
+                    e?.response?.data?.errorMessages?.[0] ||
+                    e?.message ||
+                    "Unknown error",
                   status: e?.response?.status || 500,
                 }),
               },
@@ -573,8 +759,31 @@ export class McpService {
                 uri,
                 text: JSON.stringify({
                   error: "Failed to get current sprint summary",
-                  message: e?.response?.data?.errorMessages?.[0] || e?.message || "Unknown error",
+                  message:
+                    e?.response?.data?.errorMessages?.[0] ||
+                    e?.message ||
+                    "Unknown error",
                   status: e?.response?.status || 500,
+                }),
+              },
+            ],
+          } as unknown as T;
+        }
+      }
+      if (uri.startsWith("perplexity://history/")) {
+        try {
+          const items = getPerplexityHistoryFiltered(uri);
+          return {
+            contents: [{ type: "text", text: JSON.stringify(items, null, 2) }],
+          } as unknown as T;
+        } catch (e: any) {
+          return {
+            contents: [
+              {
+                uri,
+                text: JSON.stringify({
+                  error: "Failed to get Perplexity history",
+                  message: e?.message || "Unknown error",
                 }),
               },
             ],
