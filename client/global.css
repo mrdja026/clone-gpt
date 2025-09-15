@@ -57,6 +57,9 @@
     /* Jira dark theme */
     --background: 210 12% 7%; /* #101214 */
     --foreground: 210 40% 96%;
+    /* darker, subtle gradient tints */
+    --site-grad-start: hsla(34, 100%, 20%, 0.35);
+    --site-grad-end: hsla(212, 100%, 24%, 0.35);
 
     --card: 210 10% 10%; /* surface */
     --card-foreground: 210 40% 96%;
@@ -101,5 +104,17 @@
 
   body {
     @apply bg-background text-foreground;
+    /* Theme-aware subtle top-left -> top-right gradient overlay */
+    --site-grad-start: hsla(34, 100%, 85%, 0.55); /* light orange tint */
+    --site-grad-end: hsla(212, 100%, 85%, 0.55); /* light blue tint */
+    background-image: linear-gradient(
+      90deg,
+      var(--site-grad-start) 0%,
+      transparent 35%,
+      transparent 65%,
+      var(--site-grad-end) 100%
+    );
+    background-repeat: no-repeat;
+    background-attachment: fixed;
   }
 }
