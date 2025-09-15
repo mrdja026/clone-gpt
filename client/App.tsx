@@ -7,7 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
-import PostLogin from "./pages/PostLogin";
+import PostLoginPage from "./pages/PostLogin/PostLoginPage";
 import NotFound from "./pages/NotFound";
 import About from "./pages/About";
 import ProviderPerplexity from "./pages/ProviderPerplexity";
@@ -23,7 +23,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<PostLogin />} />
+          <Route path="/" element={<PostLoginPage />} />
           <Route path="/chat" element={<Index />} />
           <Route path="/about" element={<About />} />
           <Route path="/diagnostics" element={<Diagnostics />} />
