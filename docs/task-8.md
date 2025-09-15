@@ -8,8 +8,8 @@
 - Local LLM running (your existing local model setup)
 - Node.js 18+ with fetch
 - Your existing HTTP MCP server/controller skeleton
-- Model is defined in .env
-- Adress to llm is defined in .env
+- Model is defined in .env .env.backup
+- Adress to llm is defined in .env .env.backup
 
 ## Step 1: Install Dependencies
 
@@ -496,3 +496,12 @@ curl http://localhost:3030/health
 - **Flexible**: Your local model controls all processing
 - **Contextual**: Search history available for complex reasoning
 - **Cached**: Duplicate searches served from cache
+
+# Current state ui working but data handling wierd
+
+[VITE] 18:25:31 [vite] http proxy error: /api/mcp/tools
+[VITE] AggregateError [ECONNREFUSED]:
+[VITE] at internalConnectMultiple (node:net:1118:18)
+[VITE] at afterConnectMultiple (node:net:1685:7)
+
+# ON THE UI IT SAID API KEY IS NOT VALID or it is a moxed scenario

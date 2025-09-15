@@ -10,7 +10,6 @@ fi
 
 while true; do
   clear
-  echo ">>> Sending session file to Codex (default context7)..."
   echo "======================================================"
   cat "$SESSION_FILE" | codex
   echo "======================================================"

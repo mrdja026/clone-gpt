@@ -149,29 +149,23 @@ app.post("/mcp", async (req, res) => {
           },
         });
       }
-      return res
-        .status(400)
-        .json({
-          jsonrpc: "2.0",
-          id,
-          error: { code: -32601, message: `Unknown tool: ${name}` },
-        });
+      return res.status(400).json({
+        jsonrpc: "2.0",
+        id,
+        error: { code: -32601, message: `Unknown tool: ${name}` },
+      });
     }
-    return res
-      .status(400)
-      .json({
-        jsonrpc: "2.0",
-        id,
-        error: { code: -32601, message: `Unknown method: ${method}` },
-      });
+    return res.status(400).json({
+      jsonrpc: "2.0",
+      id,
+      error: { code: -32601, message: `Unknown method: ${method}` },
+    });
   } catch (e) {
-    return res
-      .status(500)
-      .json({
-        jsonrpc: "2.0",
-        id,
-        error: { code: -32603, message: e?.message || "Internal error" },
-      });
+    return res.status(500).json({
+      jsonrpc: "2.0",
+      id,
+      error: { code: -32603, message: e?.message || "Internal error" },
+    });
   }
 });
 
@@ -559,7 +553,6 @@ Solution Applied:
 
 - Migrated `POST /api/chat/stream` to use the AI SDK DataStream directly in `server/chat/chat.controller.ts`.
 - Prefer SSE DataStream via `pipeDataStreamToResponse`; fallback to plain text chunks if not available.
-- This aligns with Context7 and Vercel AI SDK v5 streaming behavior.
 
 Impact:
 
@@ -607,8 +600,6 @@ Solution Applied:
 - `client/lib/api.ts` now detects `text/event-stream` and parses AI SDK DataStream events; otherwise falls back to raw chunked text.
 
 Impact:
-
-- Works across SDK versions and providers, preparing for Context7 tool events.
 
 **✅ Fixed: Type Safety for `DBMessage.role`**
 
