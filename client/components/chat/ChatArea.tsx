@@ -28,6 +28,7 @@ export function ChatArea({
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  const inputRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -36,6 +37,14 @@ export function ChatArea({
   useEffect(() => {
     if (initialPrompt !== undefined) setInput(initialPrompt);
   }, [initialPrompt]);
+
+  // Focus input when a new chat starts or when initialPrompt changes
+  useEffect(() => {
+    if (conversation.messages.length === 0) {
+      // Defer focus to next tick to ensure element is mounted
+      setTimeout(() => inputRef.current?.focus(), 0);
+    }
+  }, [conversation.id, conversation.messages.length, initialPrompt]);
 
   const groupHeadId = conversation.groupId ?? conversation.id;
   const base = useMemo(
@@ -117,6 +126,7 @@ export function ChatArea({
       <div className="border-t p-4 bg-background">
         <div className="flex gap-2 items-end">
           <Textarea
+            ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Ask anything…"
