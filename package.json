@@ -38,7 +38,8 @@
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:noserver": "PW_SKIP_WEBSERVER=1 playwright test",
     "playwright:install": "playwright install chromium",
-    "check:mcp": "bash scripts/check-mcp.sh"
+    "check:mcp": "bash scripts/check-mcp.sh",
+    "status:ollama": "tsx scripts/check-ollama-proxy.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^2.0.30",
