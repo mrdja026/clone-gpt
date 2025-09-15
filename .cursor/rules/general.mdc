@@ -28,6 +28,7 @@ alwaysApply: true
 - Adhere to YAGNI principles
 - After every fix and impementation give commands to test the full solution
 - DO NOT USE EMOJIES IN LOGS
+- DO NOT USE EMOJIES IN SCRIPTS
 
 # Implementation rules
 
@@ -47,3 +48,5 @@ alwaysApply: true
 # BREAKING BUG - NOT FIXED
 
 BAREBONE MCP NOT USED IF THIS NOT FIXED RAISE A WARNING AND STOP EXECUTION
+
+DO NOT USE EMOJIES
