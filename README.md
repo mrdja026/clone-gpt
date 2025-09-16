@@ -864,6 +864,28 @@ When a deterministic query is detected, the response will include both the struc
 [AI-generated insights based on the ticket data]
 ```
 
+## Live Project Status (September 2025)
+
+This section tracks the live diagnostic and implementation progress of the project.
+
+### ✅ Confirmed Working Components
+- **Server Startup**: Both the `clone-gpt` application and the external `hello-world-mcp` server start and run correctly.
+- **API Health**: Both servers are responsive on their respective health check endpoints (`/api/ping` and `/health`).
+- **Core MCP Integration**: `clone-gpt` successfully connects to `hello-world-mcp` and can list available tools. The fundamental forward-only architecture is operational.
+
+### 🚧 Current Tasks & Next Steps
+
+The current focus is on implementing and verifying the specific MCP tools within the `hello-world-mcp` server.
+
+1.  **Implement Perplexity Tool**:
+    -   **Problem**: The `fetch_perplexity_data` tool was documented but missing from the `hello-world-mcp` codebase, causing "Unknown tool" errors.
+    -   **Progress**: ⏳ The tool's logic has been written to `hello-world-mcp/src/tools/perplexity.js`.
+    -   **Next Action**: Register the new tool in `hello-world-mcp/src/server.js` and conduct an end-to-end test.
+
+2.  **Debug Jira Integration**:
+    -   **Problem**: The Jira tools are expected to fail.
+    -   **Next Action**: After the Perplexity tool is working, we will test the `fetch_jira_ticket` tool to confirm the known configuration issues (OAuth scopes and non-existent test ticket) are the only blockers.
+
 ## Known Issues
 
 ### Fixed Issues (September 2025)
