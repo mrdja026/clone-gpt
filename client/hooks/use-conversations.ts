@@ -208,15 +208,18 @@ export function useConversations() {
     let enhancedPrompt = cleanedText;
 
     if (queryMatch.isMatch && queryMatch.mcpActions.length > 0) {
+      const status = queryMatch.mcpActions.some(
+        (a) => a.toolName === "fetch_perplexity_data",
+      )
+        ? "🔍 Fetching web results..."
+        : "🔍 Fetching data from MCP...";
       setConversations((prev) =>
         prev.map((c) =>
           c.id === activeId
             ? {
                 ...c,
                 messages: c.messages.map((m) =>
-                  m.id === botMessageId
-                    ? { ...m, content: "🔍 Fetching data from JIRA..." }
-                    : m,
+                  m.id === botMessageId ? { ...m, content: status } : m,
                 ),
               }
             : c,
@@ -231,15 +234,42 @@ export function useConversations() {
               ("content" in response
                 ? response.content?.[0]?.text
                 : response.contents?.[0]?.text) || "No data returned";
-            return formatMCPResponse(action, responseText);
+            // Parse raw JSON if possible for grounding
+            let rawParsed: unknown = responseText;
+            try {
+              rawParsed =
+                typeof responseText === "string"
+                  ? JSON.parse(responseText)
+                  : responseText;
+            } catch {}
+            const formatted = formatMCPResponse(action, responseText);
+            return { action, formatted, raw: rawParsed };
           } catch (error) {
-            return `❌ Failed to execute ${action.description}: ${error instanceof Error ? error.message : "Unknown error"}`;
+            const err = `❌ Failed to execute ${action.description}: ${error instanceof Error ? error.message : "Unknown error"}`;
+            return { action, formatted: err, raw: { error: err } };
           }
         });
-        mcpResults = (await Promise.all(mcpPromises)).join("\n\n");
+
+        const results = await Promise.all(mcpPromises);
+        const formattedSection = results.map((r) => r.formatted).join("\n\n");
+        const rawAggregate = {
+          retrieved: results.map((r) => ({
+            action: r.action.description,
+            data: r.raw,
+          })),
+        } as const;
+        const rawJson = JSON.stringify(rawAggregate, null, 2);
+        const rawCapped =
+          rawJson.length > 12000
+            ? rawJson.slice(0, 12000) + "\n/* truncated */"
+            : rawJson;
+
+        mcpResults = formattedSection;
+        const retrievedBlock = `Retrieved Data (JSON):\n\n\`\`\`json\n${rawCapped}\n\`\`\``;
         enhancedPrompt = queryMatch.enhancedPrompt
-          ? `${queryMatch.enhancedPrompt}\n\nRetrieved Data:\n${mcpResults}`
-          : `${cleanedText}\n\nRetrieved Data:\n${mcpResults}`;
+          ? `${queryMatch.enhancedPrompt}\n\n${retrievedBlock}`
+          : `${cleanedText}\n\n${retrievedBlock}`;
+
         setConversations((prev) =>
           prev.map((c) =>
             c.id === activeId
@@ -249,7 +279,7 @@ export function useConversations() {
                     m.id === botMessageId
                       ? {
                           ...m,
-                          content: `${mcpResults}\n\n🤖 Analyzing data...`,
+                          content: `${formattedSection}\n\n📦 Raw Data available below in the model context.\n\n🤖 Analyzing data...`,
                         }
                       : m,
                   ),
