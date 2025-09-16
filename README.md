@@ -1461,3 +1461,57 @@ The forward-only MCP architecture is **fully operational** and ready for product
 - **Test Suites**: PowerShell and Bash scripts for validation
 - **Docker Examples**: Production deployment configurations
 - **Client Libraries**: TypeScript, Python integration examples
+
+### 📅 Progress Log (2025-09-16)
+
+**What works now**
+
+- Forward-only MCP via HTTP bridge is live; `/api/mcp/tools` shows 6 tools including `fetch_perplexity_data`.
+- Tool execution via clone-gpt → bridge → stdio works for `add_numbers` and Perplexity (with valid model/key).
+- Client grounding implemented: `client/hooks/use-conversations.ts` now
+  - Executes matched MCP actions
+  - Displays a formatted MCP section in the chat
+  - Sends a capped “Retrieved Data (JSON)” block to the LLM, reducing hallucinations
+
+**Issues observed**
+
+- Perplexity 500 due to invalid model:
+  - Error: `Perplexity API error (400): Invalid model 'llama-3.1-sonar-small-128k-online'`.
+  - Fix: use a permitted model. Recommended default: `sonar-pro`. Make it configurable via `PERPLEXITY_MODEL`.
+- Occasional call latency SLO warnings from the bridge (e.g., `tools/call took 19685ms`). This is normal for remote search but worth monitoring.
+- Unknown tool name in one request: `perplexity_search` → not registered. Use `fetch_perplexity_data`.
+- LLM streaming failed locally due to missing Ollama model:
+  - Error: `model "qwen2" not found, try pulling it first`.
+  - Fix: either pull the model in Ollama or set `MODEL_NAME` to an installed one (e.g., `llama3.1:latest`).
+
+**Validated logs (samples)**
+
+- Bridge: `[BRIDGE] tools/call completed in 19685ms` and SLO warning when >5s.
+- MCP: `Tool called: fetch_perplexity_data { query, domain, recency, max_results }`.
+- Nest: `MCP_REQUEST { path: '/api/mcp/tool', method: 'POST', durationMs: 19707 }` → then either success or a clear error.
+
+**Immediate actions**
+
+- Perplexity model
+  - Set model via env and restart the MCP bridge:
+    - PowerShell: `setx PERPLEXITY_MODEL sonar-pro`
+    - Session-only: `$env:PERPLEXITY_MODEL='sonar-pro'`
+- Restart MCP HTTP bridge
+  - `cd hello-world-mcp`
+  - `$env:MCP_HTTP_PORT='4000'`
+  - `node src/http-bridge.js`
+- LLM model
+  - Either pull the configured model in Ollama or change `MODEL_NAME` to an installed one:
+    - `ollama pull qwen2:7b-instruct` (if you want qwen2)
+    - Or set `MODEL_NAME=llama3.1:latest` in `.env`
+
+**Retest commands**
+
+- Perplexity via clone-gpt:
+
+```powershell
+$body = '{"name":"fetch_perplexity_data","arguments":{"query":"TypeScript generics best practices","domain":"developer.mozilla.org","recency":"month","max_results":2}}'
+Invoke-RestMethod -Uri "http://localhost:8080/api/mcp/tool" -Method POST -ContentType "application/json" -Body $body
+```
+
+- UI flow: enter a deterministic search (e.g., “TypeScript generics best practices”). Expect formatted MCP section, then streamed Analysis grounded by Retrieved Data (JSON).
