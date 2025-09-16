@@ -416,6 +416,47 @@ export function matchQuery(userInput: string): QueryMatch {
     };
   }
 
+  // Pattern 8a: Perplexity Space or User queries
+  {
+    // e.g., "space named RAG" or "space RAG"
+    const spaceMatch = originalInput.match(
+      /\bspace\s+(?:named\s+|called\s+)?\"?([A-Za-z0-9 _-]+)\"?/i,
+    );
+    // e.g., "perplexity user mrdjan" or "user @mrdjan"
+    const userMatch = originalInput.match(
+      /\b(?:perplexity\s+)?user\s+@?([A-Za-z0-9_.-]+)/i,
+    );
+    if (spaceMatch || userMatch) {
+      const recency = extractSearchRecency(originalInput);
+      const spaceName = spaceMatch ? spaceMatch[1].trim() : undefined;
+      const userName = userMatch ? userMatch[1].trim() : undefined;
+      const desc = spaceName
+        ? `Exploring Perplexity Space: "${spaceName}"`
+        : `Exploring Perplexity user: "${userName}"`;
+      return {
+        isMatch: true,
+        confidence: 0.95,
+        originalQuery: userInput,
+        mcpActions: [
+          {
+            toolName: "fetch_perplexity_data",
+            args: {
+              ...(spaceName ? { space_name: spaceName } : {}),
+              ...(userName ? { user: userName } : {}),
+              recency,
+              max_results: 5,
+            },
+            description: desc,
+            type: "tool",
+          },
+        ],
+        enhancedPrompt: spaceName
+          ? `Based on the Perplexity Space \"${spaceName}\" results, summarize the space's focus and list notable items with brief insights. Include citations if available.`
+          : `Based on the Perplexity user \"${userName}\" profile/results, summarize key areas of expertise and notable content. Include citations if available.`,
+      };
+    }
+  }
+
   // Pattern 8: Perplexity search queries - detect search intent
   if (
     isSearchQuery(input) &&

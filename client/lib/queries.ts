@@ -30,5 +30,30 @@ export const deterministicQueries: QueryTemplate[] = [
     template:
       "Create a 2-week sprint plan for team TEAM-A targeting 30 story points based on backlog.",
   },
+  // Perplexity predefined queries
+  {
+    id: "p1",
+    label: "Search: React 19 release notes (latest)",
+    template: "search React 19 release notes latest",
+  },
+  {
+    id: "p2",
+    label: "Search: TypeScript generics best practices",
+    template: "search TypeScript generics best practices",
+  },
+  {
+    id: "p3",
+    label: "Search: Node.js LTS news (recent)",
+    template: "search Node.js LTS recent",
+  },
+  {
+    id: "p4",
+    label: "Perplexity Space: RAG",
+    template: "space named RAG",
+  },
+  {
+    id: "p5",
+    label: "Perplexity User: your handle",
+    template: "perplexity user @your-handle",
+  },
 ];
-
