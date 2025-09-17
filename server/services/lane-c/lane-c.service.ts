@@ -1,0 +1,362 @@
+import { Injectable, Logger, Inject } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import {
+  LaneCInput,
+  LaneCOutput,
+  LaneAOutput,
+  LaneBOutput,
+  ChatMessage,
+} from "@shared/api";
+import {
+  LaneCConfig,
+  OllamaChatRequest,
+  OllamaChatResponse,
+  DataAnalysisPrompt,
+  GeneralChatPrompt,
+} from "./types/lane-c.types";
+
+@Injectable()
+export class LaneCService {
+  private readonly logger = new Logger(LaneCService.name);
+  private readonly config: LaneCConfig;
+
+  constructor(private configService: ConfigService) {
+    this.logger.log("LaneCService constructor called");
+    this.logger.log("ConfigService exists:", !!this.configService);
+
+    if (!this.configService) {
+      this.logger.error(
+        "ConfigService is null/undefined! Creating fallback config...",
+      );
+      const laneCHost = process.env.LANE_C_HOST || "127.0.0.1:124";
+      this.config = {
+        modelName: process.env.MODEL_NAME || "qwen2.5:7b",
+        ollamaUrl: process.env.OLLAMA_URL || `http://${laneCHost}/api/chat`,
+        temperature: parseFloat(process.env.LANE_C_TEMPERATURE || "0.7"),
+        maxTokens: parseInt(process.env.LANE_C_MAX_TOKENS || "2048"),
+      };
+    } else {
+      const laneCHost = this.configService.get<string>(
+        "LANE_C_HOST",
+        "127.0.0.1:124",
+      );
+      this.config = {
+        modelName: this.configService.get<string>("MODEL_NAME", "qwen2.5:7b"),
+        ollamaUrl: this.configService.get<string>(
+          "OLLAMA_URL",
+          `http://${laneCHost}/api/chat`,
+        ),
+        temperature: this.configService.get<number>("LANE_C_TEMPERATURE", 0.7),
+        maxTokens: this.configService.get<number>("LANE_C_MAX_TOKENS", 2048),
+      };
+    }
+
+    this.logger.log(`Lane C configured with model: ${this.config.modelName}`);
+  }
+
+  async processAnalysis(input: LaneCInput): Promise<LaneCOutput> {
+    this.logger.log(`Processing Lane C analysis for query: ${input.userQuery}`);
+
+    try {
+      // Determine if we have structured data or should do general chat
+      const hasStructuredData =
+        input.rawData?.metadata?.status === "success" &&
+        input.rawData.rawJson &&
+        Object.keys(input.rawData.rawJson).length > 0;
+
+      if (hasStructuredData) {
+        return await this.performDataAnalysis(input);
+      } else {
+        return await this.performGeneralChat(input);
+      }
+    } catch (error) {
+      this.logger.error(`Error in Lane C processing: ${error.message}`);
+      return this.createFallbackResponse(input, error.message);
+    }
+  }
+
+  private async performDataAnalysis(input: LaneCInput): Promise<LaneCOutput> {
+    this.logger.log("Performing data analysis with structured data");
+
+    const prompt = this.buildDataAnalysisPrompt(input);
+    const messages: OllamaChatRequest["messages"] = [
+      {
+        role: "system",
+        content: prompt.systemPrompt,
+      },
+      {
+        role: "user",
+        content: prompt.userPrompt,
+      },
+    ];
+
+    // Add chat history context if available
+    if (input.chatHistory && input.chatHistory.length > 0) {
+      const contextMessages = this.buildContextFromHistory(input.chatHistory);
+      messages.splice(1, 0, ...contextMessages);
+    }
+
+    const response = await this.callOllamaModel(messages);
+
+    return this.parseDataAnalysisResponse(response, input);
+  }
+
+  private async performGeneralChat(input: LaneCInput): Promise<LaneCOutput> {
+    this.logger.log("Performing general chat (no structured data available)");
+
+    const prompt = this.buildGeneralChatPrompt(input);
+    const messages: OllamaChatRequest["messages"] = [
+      {
+        role: "system",
+        content: prompt.systemPrompt,
+      },
+      {
+        role: "user",
+        content: prompt.userPrompt,
+      },
+    ];
+
+    // Add chat history for continuity
+    if (input.chatHistory && input.chatHistory.length > 0) {
+      const contextMessages = this.buildContextFromHistory(input.chatHistory);
+      messages.splice(1, 0, ...contextMessages);
+    }
+
+    const response = await this.callOllamaModel(messages);
+
+    return this.parseGeneralChatResponse(response, input);
+  }
+
+  private buildDataAnalysisPrompt(input: LaneCInput): DataAnalysisPrompt {
+    const rawDataStr = JSON.stringify(input.rawData.rawJson, null, 2);
+
+    return {
+      systemPrompt: `You are an expert data analyst with deep knowledge of software development, project management, and technical systems.
+
+Your task is to analyze structured data and provide actionable insights. You have access to raw JSON data from various sources (JIRA tickets, documentation, metrics, etc.).
+
+Guidelines for analysis:
+1. **Be specific and actionable** - Reference actual data points, not generalities
+2. **Identify patterns and trends** - Look for recurring issues, common blockers, or success patterns
+3. **Provide context** - Explain why certain patterns matter
+4. **Suggest concrete next steps** - Don't just identify problems, propose solutions
+5. **Be confident but realistic** - Base confidence on data quality and completeness
+6. **Consider stakeholder impact** - Think about effects on users, developers, and business
+
+Always structure your response with:
+- **Key Findings**: What stands out in the data
+- **Analysis**: Deeper insights and patterns
+- **Recommendations**: Specific, actionable suggestions
+- **Risk Assessment**: Potential issues or concerns
+- **Confidence Level**: How reliable your analysis is
+
+Use the raw data provided to back up all your statements.`,
+      userPrompt: `Please analyze this data in response to the user's query:
+
+**User Query:** ${input.userQuery}
+
+**Raw Data:**
+\`\`\`json
+${rawDataStr}
+\`\`\`
+
+**Context:** This appears to be ${input.context.detectedIntent.replace("_", " ")} data with ${input.context.confidence * 100}% confidence in detection.
+
+Provide a comprehensive analysis following the guidelines above.`,
+    };
+  }
+
+  private buildGeneralChatPrompt(input: LaneCInput): GeneralChatPrompt {
+    return {
+      systemPrompt: `You are a helpful AI assistant with expertise in software development, project management, and technical systems.
+
+You are currently in general conversation mode because no structured data was available for analysis. Be helpful, informative, and engaging while staying within your areas of expertise.
+
+Guidelines:
+1. **Be conversational but professional** - Friendly yet informative
+2. **Stay on topic** - Focus on software development, tech, and related domains
+3. **Ask clarifying questions** - If the query is ambiguous
+4. **Provide practical advice** - When appropriate
+5. **Admit limitations** - If you're unsure about something
+6. **Be encouraging** - Especially for learning and problem-solving
+
+If this seems like it should be a structured data query, suggest how to phrase it better for data analysis.`,
+      userPrompt: `User query: ${input.userQuery}
+
+${input.context ? `Context: This was classified as ${input.context.detectedIntent.replace("_", " ")} with ${input.context.confidence * 100}% confidence.` : ""}
+
+Please provide a helpful response to this query.`,
+    };
+  }
+
+  private buildContextFromHistory(
+    chatHistory: ChatMessage[],
+  ): OllamaChatRequest["messages"] {
+    // Take the last 6 messages (3 pairs) for context
+    const recentHistory = chatHistory.slice(-6);
+
+    return recentHistory.map((msg) => ({
+      role: msg.role === "assistant" ? "assistant" : "user",
+      content: msg.content,
+    }));
+  }
+
+  private async callOllamaModel(
+    messages: OllamaChatRequest["messages"],
+  ): Promise<string> {
+    const request: OllamaChatRequest = {
+      model: this.config.modelName,
+      messages,
+      stream: false,
+      options: {
+        temperature: this.config.temperature,
+        max_tokens: this.config.maxTokens,
+      },
+    };
+
+    this.logger.debug(
+      `Calling Ollama model ${this.config.modelName} at ${this.config.ollamaUrl}`,
+    );
+
+    try {
+      const response = await fetch(this.config.ollamaUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(request),
+      });
+
+      if (!response.ok) {
+        throw new Error(
+          `Ollama API error: ${response.status} ${response.statusText}`,
+        );
+      }
+
+      const data: OllamaChatResponse = await response.json();
+      return data.message.content.trim();
+    } catch (error) {
+      this.logger.error(`Failed to call Ollama model: ${error.message}`);
+      throw error;
+    }
+  }
+
+  private parseDataAnalysisResponse(
+    response: string,
+    input: LaneCInput,
+  ): LaneCOutput {
+    // Extract insights and recommendations from the response
+    const insights = this.extractInsights(response);
+    const recommendations = this.extractRecommendations(response);
+    const confidence = this.calculateConfidence(response, input);
+
+    return {
+      analysis: response,
+      insights,
+      recommendations,
+      confidence,
+      mode: "data_analysis",
+    };
+  }
+
+  private parseGeneralChatResponse(
+    response: string,
+    input: LaneCInput,
+  ): LaneCOutput {
+    return {
+      analysis: response,
+      insights: [],
+      recommendations: [],
+      confidence: 0.8, // General chat has reasonable confidence
+      mode: "general_chat",
+    };
+  }
+
+  private extractInsights(response: string): string[] {
+    const insights: string[] = [];
+
+    // Look for common patterns in analysis responses
+    const patterns = [
+      /key finding[s]?:?\s*(.*?)(?=\n\n|\*\*|$)/gi,
+      /analysis:?\s*(.*?)(?=\n\n|\*\*|$)/gi,
+      /insight[s]?:?\s*(.*?)(?=\n\n|\*\*|$)/gi,
+      /(?:•|\-|\*)\s*(.*?)(?=\n|$)/g,
+    ];
+
+    patterns.forEach((pattern) => {
+      let match;
+      while ((match = pattern.exec(response)) !== null) {
+        const insight = match[1].trim();
+        if (insight.length > 10) {
+          // Only meaningful insights
+          insights.push(insight);
+        }
+      }
+    });
+
+    return insights.slice(0, 5); // Limit to 5 insights
+  }
+
+  private extractRecommendations(response: string): string[] {
+    const recommendations: string[] = [];
+
+    // Look for recommendation patterns
+    const patterns = [
+      /recommendation[s]?:?\s*(.*?)(?=\n\n|\*\*|$)/gi,
+      /next step[s]?:?\s*(.*?)(?=\n\n|\*\*|$)/gi,
+      /suggestion[s]?:?\s*(.*?)(?=\n\n|\*\*|$)/gi,
+      /action item[s]?:?\s*(.*?)(?=\n\n|\*\*|$)/gi,
+    ];
+
+    patterns.forEach((pattern) => {
+      let match;
+      while ((match = pattern.exec(response)) !== null) {
+        const recommendation = match[1].trim();
+        if (recommendation.length > 10) {
+          recommendations.push(recommendation);
+        }
+      }
+    });
+
+    return recommendations.slice(0, 5); // Limit to 5 recommendations
+  }
+
+  private calculateConfidence(response: string, input: LaneCInput): number {
+    let confidence = 0.5; // Base confidence
+
+    // Increase confidence based on data quality
+    if (input.rawData?.rawJson) {
+      confidence += 0.2; // Has raw data
+    }
+
+    // Increase confidence based on response quality indicators
+    if (response.includes("data") || response.includes("analysis")) {
+      confidence += 0.2;
+    }
+
+    if (response.includes("specific") || response.includes("based on")) {
+      confidence += 0.1;
+    }
+
+    // Context confidence
+    if (input.context?.confidence) {
+      confidence += input.context.confidence * 0.2;
+    }
+
+    return Math.min(confidence, 0.95); // Cap at 95%
+  }
+
+  private createFallbackResponse(
+    input: LaneCInput,
+    errorMessage: string,
+  ): LaneCOutput {
+    return {
+      analysis: `I encountered an issue while processing your request: ${errorMessage}. However, I can still help with general questions about software development, project management, or technical topics.`,
+      insights: ["Unable to analyze data due to processing error"],
+      recommendations: [
+        "Try rephrasing your query",
+        "Check if the data source is available",
+      ],
+      confidence: 0.3,
+      mode: "general_chat",
+    };
+  }
+}

@@ -94,3 +94,55 @@ export interface LaneBResponse {
   tool_calls?: LaneBToolCall[];
   chat?: string;
 }
+
+// Third Lane types for sequential AI processing
+export interface LaneAOutput {
+  detectedIntent: "jira_ticket" | "search" | "analysis" | "general_chat";
+  ticketKey?: string;
+  confidence: number;
+  rawQuery: string;
+}
+
+export interface LaneBOutput {
+  rawJson: any;
+  formattedData: string;
+  metadata: {
+    source: string;
+    timestamp: number;
+    status: "success" | "error";
+  };
+}
+
+export interface LaneCInput {
+  rawData: LaneBOutput;
+  userQuery: string;
+  context: LaneAOutput;
+  chatHistory?: ChatMessage[];
+}
+
+export interface LaneCOutput {
+  analysis: string;
+  insights: string[];
+  recommendations: string[];
+  confidence: number;
+  mode: "data_analysis" | "general_chat";
+}
+
+export interface ThirdLaneRequest {
+  userQuery: string;
+  chatId?: string;
+  chatHistory?: ChatMessage[];
+  context?: Record<string, any>;
+}
+
+export interface ThirdLaneResponse {
+  response: string;
+  mode: "data_analysis" | "general_chat";
+  analysis?: {
+    insights: string[];
+    recommendations: string[];
+    confidence: number;
+  };
+  rawData?: LaneBOutput;
+  chatId?: string;
+}

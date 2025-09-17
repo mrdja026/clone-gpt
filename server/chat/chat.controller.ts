@@ -7,6 +7,7 @@ import {
   Res,
   HttpException,
   HttpStatus,
+  HttpCode,
 } from "@nestjs/common";
 import type { Response } from "express";
 import { ChatService } from "./chat.service";
@@ -22,12 +23,18 @@ import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { getEffectiveOllamaBaseUrl } from "../utils/ollama-proxy";
 import axios from "axios";
 import { z } from "zod";
+import { ThirdLaneService } from "../services/lane-c/third-lane.service";
+import {
+  ThirdLaneQueryDto,
+  ThirdLaneResponseDto,
+} from "../services/lane-c/dto/third-lane.dto";
 
 @Controller("chat")
 export class ChatController {
   constructor(
     private readonly chatService: ChatService,
     private readonly enhancedChatService: EnhancedChatService,
+    private readonly thirdLaneService: ThirdLaneService,
   ) {}
 
   @Post("stream")
@@ -324,6 +331,71 @@ export class ChatController {
       throw new HttpException(
         {
           error: "Failed to get chat history",
+          message: error instanceof Error ? error.message : "Unknown error",
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  // Third Lane endpoints for sequential AI processing
+
+  @Post("third-lane")
+  @HttpCode(HttpStatus.OK)
+  async thirdLaneChat(
+    @Body() queryDto: ThirdLaneQueryDto,
+  ): Promise<ThirdLaneResponseDto> {
+    try {
+      console.log(`Processing Third Lane query: ${queryDto.query}`);
+
+      const result = await this.thirdLaneService.processQuery({
+        userQuery: queryDto.query,
+        chatId: queryDto.chatId,
+        chatHistory: queryDto.chatHistory,
+        context: queryDto.context,
+      });
+
+      return {
+        response: result.response,
+        mode: result.mode,
+        analysis: result.analysis,
+        rawData: result.rawData,
+        chatId: result.chatId,
+      };
+    } catch (error) {
+      console.error("Third Lane chat error:", error);
+      throw new HttpException(
+        {
+          error: "Failed to process Third Lane request",
+          message: error instanceof Error ? error.message : "Unknown error",
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Post("third-lane/simple")
+  @HttpCode(HttpStatus.OK)
+  async thirdLaneSimpleChat(
+    @Body() body: { query: string },
+  ): Promise<ThirdLaneResponseDto> {
+    try {
+      console.log(`Processing simple Third Lane query: ${body.query}`);
+
+      const result = await this.thirdLaneService.processSimpleQuery(body.query);
+
+      return {
+        response: result.response,
+        mode: result.mode,
+        analysis: result.analysis,
+        rawData: result.rawData,
+        chatId: result.chatId,
+      };
+    } catch (error) {
+      console.error("Third Lane simple chat error:", error);
+      throw new HttpException(
+        {
+          error: "Failed to process Third Lane simple request",
           message: error instanceof Error ? error.message : "Unknown error",
         },
         HttpStatus.INTERNAL_SERVER_ERROR,

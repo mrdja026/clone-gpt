@@ -86,9 +86,13 @@ ${JSON.stringify(SUPPORTED_TOOLS, null, 2)}
   }
 
   private async callOllama(prompt: string): Promise<string> {
+    const laneAHost = this.configService.get<string>(
+      "LANE_A_HOST",
+      "127.0.0.1:123",
+    );
     const ollamaUrl = this.configService.get<string>(
       "OLLAMA_URL",
-      "http://localhost:11434/api/generate",
+      `http://${laneAHost}/api/generate`,
     );
     const model = this.configService.get<string>(
       "GEMMA_MODEL",
