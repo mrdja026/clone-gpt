@@ -1,5 +1,6 @@
 /**
  * Query Matcher - Detects deterministic queries and maps them to MCP tool calls
+ * Enhanced with Lane B's proven JIRA ticket detection and tool call generation patterns
  */
 
 export interface MCPAction {
@@ -150,19 +151,114 @@ function extractSearchRecency(text: string): string {
 }
 
 /**
+ * Lane B Enhanced Fallback Matcher - Uses proven regex patterns from Lane B success
+ * This provides a deterministic fallback when main pattern matching fails
+ */
+function laneBEnhancedFallback(userInput: string): QueryMatch | null {
+  const input = userInput.trim();
+
+  // Lane B's core JIRA pattern - proven to work with SCRUM-42 format
+  const jiraMatch = input.match(/\b([A-Z][A-Z0-9]+-\d+)\b/);
+  if (jiraMatch) {
+    const ticketKey = jiraMatch[1];
+    return {
+      isMatch: true,
+      confidence: 0.98, // Very high confidence for Lane B's proven pattern
+      originalQuery: userInput,
+      mcpActions: [
+        {
+          toolName: "fetch_ticket",
+          args: { ticketKey },
+          description: `Fetching JIRA ticket ${ticketKey} (Lane B fallback)`,
+          type: "tool",
+        },
+      ],
+      enhancedPrompt: `Lane B enhanced fallback: Only use the retrieved JIRA data for ticket ${ticketKey}. Do not hallucinate.`,
+    };
+  }
+
+  // Lane B's space pattern
+  const spaceMatch = input.match(
+    /\bspace\s+(?:named\s+|called\s+)?\"?([A-Za-z0-9 _-]+)\"?/i,
+  );
+  if (spaceMatch) {
+    const spaceName = spaceMatch[1].trim();
+    return {
+      isMatch: true,
+      confidence: 0.95,
+      originalQuery: userInput,
+      mcpActions: [
+        {
+          toolName: "fetch_perplexity_data",
+          args: { space_name: spaceName },
+          description: `Exploring Perplexity Space: ${spaceName} (Lane B fallback)`,
+          type: "tool",
+        },
+      ],
+      enhancedPrompt: `Lane B enhanced fallback: Provide insights about the Perplexity Space "${spaceName}".`,
+    };
+  }
+
+  // Lane B's user pattern
+  const userMatch = input.match(
+    /\b(?:perplexity\s+)?user\s+@?([A-Za-z0-9_.-]+)/i,
+  );
+  if (userMatch) {
+    const userName = userMatch[1].trim();
+    return {
+      isMatch: true,
+      confidence: 0.95,
+      originalQuery: userInput,
+      mcpActions: [
+        {
+          toolName: "fetch_perplexity_data",
+          args: { user: userName },
+          description: `Exploring Perplexity user: ${userName} (Lane B fallback)`,
+          type: "tool",
+        },
+      ],
+      enhancedPrompt: `Lane B enhanced fallback: Provide insights about the Perplexity user "${userName}".`,
+    };
+  }
+
+  return null; // No fallback match found
+}
+
+/**
  * Match user query against deterministic patterns and generate MCP actions
+ * Enhanced with Lane B's proven patterns and fallback mechanisms
  */
 export function matchQuery(userInput: string): QueryMatch {
   const input = userInput.toLowerCase().trim();
   const originalInput = userInput.trim();
 
-  // High-priority: bare JIRA key (e.g., "SCRUM-8") should directly call the ticket tool
+  // Lane B Enhanced: High-priority JIRA key detection using proven regex pattern
+  const laneBJiraKey = originalInput.match(/\b([A-Z][A-Z0-9]+-\d+)\b/);
+  if (laneBJiraKey) {
+    const ticketKey = laneBJiraKey[1];
+    return {
+      isMatch: true,
+      confidence: 0.99,
+      originalQuery: userInput,
+      mcpActions: [
+        {
+          toolName: "fetch_ticket", // Lane B's proven tool name
+          args: { ticketKey }, // Lane B's argument format
+          description: `Fetching details for JIRA ticket ${ticketKey} (Lane B enhanced)`,
+          type: "tool",
+        },
+      ],
+      enhancedPrompt: `You are in strict analysis mode. Only use the 'Retrieved Data' from MCP JIRA to answer. If it is empty or an error, state that no data was retrieved for ${ticketKey} and stop. Do not hallucinate.`,
+    };
+  }
+
+  // Fallback: bare JIRA key (original pattern)
   const bareKey = originalInput.match(/^\s*([A-Z][A-Z0-9]+-\d+)\s*$/);
   if (bareKey) {
     const ticketKey = bareKey[1];
     return {
       isMatch: true,
-      confidence: 0.99,
+      confidence: 0.95,
       originalQuery: userInput,
       mcpActions: [
         {
@@ -194,22 +290,22 @@ export function matchQuery(userInput: string): QueryMatch {
             {
               toolName: "process_text",
               args: { text: originalInput },
-              description: `Processing text command for ticket ${ticketIds[0]}`,
+              description: `Processing text command for ticket ${ticketIds[0]} (Lane B enhanced)`,
               type: "tool",
             },
           ],
           enhancedPrompt: `You are in strict analysis mode. Only use the 'Retrieved Data' below that comes from the MCP JIRA tool. If no data is present, reply: "No JIRA data found for ${ticketIds[0]}". Do not infer or hallucinate.`,
         };
       } else {
-        // Use traditional fetch_jira_ticket for other patterns
+        // Lane B Enhanced: Use proven fetch_ticket tool format for better compatibility
         return {
           isMatch: true,
-          confidence: 0.95,
+          confidence: 0.97, // Higher confidence for Lane B enhanced
           originalQuery: userInput,
           mcpActions: ticketIds.map((ticketKey) => ({
-            toolName: "fetch_jira_ticket",
-            args: { ticketKey },
-            description: `Fetching details for JIRA ticket ${ticketKey}`,
+            toolName: "fetch_ticket", // Lane B's proven tool name
+            args: { ticketKey }, // Lane B's argument format
+            description: `Fetching details for JIRA ticket ${ticketKey} (Lane B enhanced)`,
             type: "tool",
           })),
           enhancedPrompt: `You are in strict analysis mode. Only use the 'Retrieved Data' below that comes from the MCP JIRA tool. If no data is present, reply: "No JIRA data found for ${ticketIds[0]}". Do not infer or hallucinate.`,
@@ -308,22 +404,22 @@ export function matchQuery(userInput: string): QueryMatch {
             {
               toolName: "process_text",
               args: { text: originalInput },
-              description: `Processing text command for ticket ${jiraKeys[0]}`,
+              description: `Processing text command for ticket ${jiraKeys[0]} (Lane B enhanced)`,
               type: "tool",
             },
           ],
           enhancedPrompt: `You are in strict analysis mode. Only use the 'Retrieved Data' from MCP JIRA to answer. If it is empty or an error, state that no data was retrieved for ${jiraKeys[0]} and stop. Do not hallucinate.`,
         };
       } else {
-        // Use traditional fetch_jira_ticket for other patterns
+        // Lane B Enhanced: Use proven fetch_ticket tool format for better compatibility
         return {
           isMatch: true,
-          confidence: 0.85,
+          confidence: 0.9, // Higher confidence for Lane B enhanced
           originalQuery: userInput,
           mcpActions: jiraKeys.map((ticketKey) => ({
-            toolName: "fetch_jira_ticket",
-            args: { ticketKey },
-            description: `Fetching details for JIRA ticket ${ticketKey}`,
+            toolName: "fetch_ticket", // Lane B's proven tool name
+            args: { ticketKey }, // Lane B's argument format
+            description: `Fetching details for JIRA ticket ${ticketKey} (Lane B enhanced)`,
             type: "tool",
           })),
           enhancedPrompt: `You are in strict analysis mode. Only use the 'Retrieved Data' from MCP JIRA to answer. If it is empty or an error, state that no data was retrieved for ${jiraKeys[0]} and stop. Do not hallucinate.`,
@@ -490,23 +586,30 @@ export function matchQuery(userInput: string): QueryMatch {
     };
   }
 
-  // Fallback: If any JIRA key appears anywhere in the input, fetch it
+  // Lane B Enhanced Fallback: If any JIRA key appears anywhere in the input, fetch it
+  // This is Lane B's core success - catching tickets with proven regex pattern
   {
     const jiraKeys = extractJiraKeys(originalInput);
     if (jiraKeys.length > 0) {
       return {
         isMatch: true,
-        confidence: 0.9,
+        confidence: 0.95, // Higher confidence for Lane B enhanced fallback
         originalQuery: userInput,
         mcpActions: jiraKeys.map((ticketKey) => ({
-          toolName: "fetch_jira_ticket",
-          args: { ticketKey },
-          description: `Fetching details for JIRA ticket ${ticketKey}`,
+          toolName: "fetch_ticket", // Lane B's proven tool name
+          args: { ticketKey }, // Lane B's argument format
+          description: `Fetching details for JIRA ticket ${ticketKey} (Lane B enhanced fallback)`,
           type: "tool",
         })),
         enhancedPrompt: `You are in strict analysis mode. Only use the 'Retrieved Data' below that comes from the MCP JIRA tool. If no data is present, reply: "No JIRA data found for ${jiraKeys[0]}". Do not infer or hallucinate.`,
       };
     }
+  }
+
+  // Lane B Enhanced Fallback: Last resort using Lane B's proven patterns
+  const fallbackResult = laneBEnhancedFallback(originalInput);
+  if (fallbackResult) {
+    return fallbackResult;
   }
 
   // No match found
@@ -531,14 +634,15 @@ export function formatMCPResponse(action: MCPAction, response: any): string {
     switch (identifier) {
       case "process_text": // dumbing down the process @mrdjanstajic
       case "fetch_jira_ticket":
+      case "fetch_ticket": // Lane B's proven tool name
         // Handle error case first
         if (data.error || data.status === "error") {
           return `⚠️ **Error:** ${data.error || "Unknown error"}
 📝 **Details:** ${data.message || "No additional details available."}
 `;
         }
-        // Normal response
-        return `**JIRA Ticket: ${data.key}**
+        // Normal response - Lane B enhanced formatting
+        return `**JIRA Ticket: ${data.key}** (Lane B enhanced)
 📋 **Summary:** ${data.summary}
 📊 **Status:** ${data.status}
 👤 **Assignee:** ${data.assignee || "Unassigned"}
