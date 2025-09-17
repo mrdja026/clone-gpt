@@ -5,9 +5,11 @@ import { ThirdLaneOrchestrator } from "./lane-c.orchestrator";
 import { ThirdLaneService } from "./third-lane.service";
 import { ThirdLaneController } from "./third-lane.controller";
 import { LaneBModule } from "../lane-b/lane-b.module";
+import { ReasoningModule } from "../reasoning/reasoning.module";
+import { McpModule } from "../../mcp/mcp.module";
 
 @Module({
-  imports: [forwardRef(() => LaneBModule)],
+  imports: [forwardRef(() => LaneBModule), ReasoningModule, McpModule],
   controllers: [ThirdLaneController],
   providers: [LaneCService, ThirdLaneOrchestrator, ThirdLaneService],
   exports: [LaneCService, ThirdLaneOrchestrator, ThirdLaneService],

@@ -908,6 +908,41 @@ The application provides these API endpoints for MCP interaction:
 - `POST /api/mcp/tool` - Execute MCP tool call
 - `POST /api/mcp/resource` - Read MCP resource
 
+#### JIRA Project Tree Endpoints
+
+The application includes comprehensive JIRA project tree functionality that builds a complete 3-level hierarchy:
+
+**Project → Epics → Issues (Story/Task/Bug) → Subtasks**
+
+- `GET /api/jira/project-tree/:projectKeyOrId` - Fetch project tree for a specific project
+- `POST /api/jira/project-tree` - Fetch project tree with request body
+- `POST /api/mcp/jira-project-tree` - MCP tool endpoint for project tree
+
+**Example Usage:**
+
+```bash
+# Get project tree for project "WEB"
+curl "http://localhost:3001/api/jira/project-tree/WEB?pageSize=50"
+
+# Test via MCP endpoint
+curl -X POST http://localhost:3001/api/mcp/jira-project-tree \
+  -H "Content-Type: application/json" \
+  -d '{"projectKeyOrId": "WEB", "pageSize": 100}'
+
+# Test the implementation
+node scripts/test-jira-project-tree.js
+```
+
+**Features:**
+
+- Smart field discovery (Story Points, Sprint fields)
+- Dual Epic linking support (modern Parent + legacy Epic Link fallback)
+- Comprehensive data structure with time tracking
+- Pagination support for large projects
+- Automatic authentication handling
+
+See [`docs/jira-project-tree-implementation.md`](docs/jira-project-tree-implementation.md) for detailed documentation.
+
 ### Fixture/Internal Adapter Mode
 
 For deterministic local runs and CI, the server can serve MCP responses from fixtures without spawning an external MCP process. Enable fixtures:

@@ -1,15 +1,44 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 export function DeterministicSearchBar({
   onApply,
   placeholder = "Type to search deterministic queries...",
+  value: externalValue,
+  onChange,
 }: {
   onApply: (query: string) => void;
   placeholder?: string;
+  value?: string;
+  onChange?: (value: string) => void;
 }) {
-  const [value, setValue] = useState("");
+  const [internalValue, setInternalValue] = useState("");
+  const isControlled = externalValue !== undefined;
+  const value = isControlled ? externalValue : internalValue;
+
+  const setValue = (newValue: string) => {
+    if (isControlled) {
+      onChange?.(newValue);
+    } else {
+      setInternalValue(newValue);
+    }
+  };
+
+  useEffect(() => {
+    if (isControlled && externalValue !== undefined) {
+      // Focus the input when external value changes
+      const input = document.querySelector(
+        'input[placeholder*="deterministic"]',
+      ) as HTMLInputElement;
+      if (input) {
+        setTimeout(() => {
+          input.focus();
+          input.setSelectionRange(input.value.length, input.value.length);
+        }, 0);
+      }
+    }
+  }, [externalValue, isControlled]);
   return (
     <div className="max-w-2xl mx-auto space-y-4">
       <div className="flex gap-4">
