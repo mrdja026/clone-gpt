@@ -66,14 +66,185 @@ export interface QueryTemplate {
   updated_at: string;
 }
 
-// Jira types used in both client and server
+// Enhanced Jira types used in both client and server
 export interface JiraTicket {
+  // Basic identification
   key: string;
+  id: string;
+  self: string;
   summary: string;
-  status: string;
-  assignee?: string; // Jira display name or undefined
-  priority?: string;
   description: string;
+
+  // Status and workflow
+  status: {
+    name: string;
+    id: string;
+    statusCategory: string;
+    description: string;
+  };
+
+  // Issue classification
+  issueType: {
+    name: string;
+    id: string;
+    description: string;
+    iconUrl: string;
+  };
+
+  // Priority
+  priority: {
+    name: string;
+    id: string | null;
+    iconUrl: string | null;
+  };
+
+  // People
+  assignee: {
+    displayName: string;
+    accountId: string | null;
+    emailAddress?: string;
+    avatarUrls?: any;
+  };
+
+  reporter: {
+    displayName: string;
+    accountId: string | null;
+    emailAddress?: string;
+    avatarUrls?: any;
+  };
+
+  // Dates
+  created: string;
+  updated: string;
+  duedate: string | null;
+  resolutiondate: string | null;
+
+  // Project information
+  project: {
+    key: string;
+    name: string;
+    id: string;
+    projectTypeKey: string;
+  };
+
+  // Resolution
+  resolution: {
+    name: string;
+    description: string;
+  } | null;
+
+  // Components and versions
+  components: Array<{
+    name: string;
+    id: string;
+    description: string;
+  }>;
+
+  fixVersions: Array<{
+    name: string;
+    id: string;
+    description: string;
+    released: boolean;
+    releaseDate: string | null;
+  }>;
+
+  affectedVersions: Array<{
+    name: string;
+    id: string;
+    description: string;
+    released: boolean;
+    releaseDate: string | null;
+  }>;
+
+  // Labels and environment
+  labels: string[];
+  environment: string | null;
+
+  // Story points and time tracking
+  storyPoints: number | null;
+  timeTracking: {
+    originalEstimate?: string;
+    remainingEstimate?: string;
+    timeSpent?: string;
+    originalEstimateSeconds?: number;
+    remainingEstimateSeconds?: number;
+    timeSpentSeconds?: number;
+  } | null;
+
+  // Security
+  security: {
+    name: string;
+    description: string;
+  } | null;
+
+  // Linked issues
+  linkedIssues: Array<{
+    id: string;
+    type: {
+      name: string;
+      inward: string;
+      outward: string;
+    };
+    inwardIssue: {
+      key: string;
+      summary: string;
+      status: string;
+      priority: string;
+    } | null;
+    outwardIssue: {
+      key: string;
+      summary: string;
+      status: string;
+      priority: string;
+    } | null;
+  }>;
+
+  // Attachments and comments
+  attachmentsCount: number;
+  attachments: Array<{
+    id: string;
+    filename: string;
+    size: number;
+    mimeType: string;
+    created: string;
+    author: string;
+  }>;
+
+  commentsCount: number;
+  recentComments: Array<{
+    id: string;
+    author: string;
+    body: string;
+    created: string;
+    updated: string;
+  }>;
+
+  // Activity metrics
+  watchersCount: number;
+  votesCount: number;
+
+  // Progress
+  progress: {
+    progress: number;
+    total: number;
+    percent: number;
+  } | null;
+
+  // Parent/child relationships
+  parent: {
+    key: string;
+    summary: string;
+    status: string;
+  } | null;
+
+  subtasks: Array<{
+    key: string;
+    summary: string;
+    status: string;
+    assignee: string;
+  }>;
+
+  // Legacy fields for backward compatibility
   blockers?: string[];
 }
 
