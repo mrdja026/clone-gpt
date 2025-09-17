@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -15,6 +15,8 @@ import ThemeToggle from "@/components/ThemeToggle";
 import { ChatArea } from "@/components/chat/ChatArea";
 import { usePerplexityChat } from "@/hooks/use-perplexity-chat";
 import { cn } from "@/lib/utils";
+import { deterministicQueries } from "@/lib/queries";
+import { TemplatesGrid } from "@/components/home/TemplatesGrid";
 
 export default function ProviderPerplexity() {
   const {
@@ -26,15 +28,34 @@ export default function ProviderPerplexity() {
     checkAvailability,
   } = usePerplexityChat();
 
+  const [showTemplates, setShowTemplates] = useState(true);
+
   // Check if Perplexity tool is available on mount
   useEffect(() => {
     checkAvailability();
   }, [checkAvailability]);
 
+  // Filter queries to show only Perplexity-related ones
+  const perplexityQueries = deterministicQueries.filter((q) =>
+    q.id.startsWith("p"),
+  );
+
+  // Hide templates once conversation starts
+  useEffect(() => {
+    if (conversation.messages.length > 0) {
+      setShowTemplates(false);
+    }
+  }, [conversation.messages.length]);
+
   // No-op handlers for chat components that aren't needed for standalone chat
   const handleBranchFrom = () => {};
   const handleSwitchConversation = () => {};
   const handleCloseConversation = () => {};
+
+  const handleTemplateSelect = (template: string) => {
+    setShowTemplates(false);
+    sendMessage(template);
+  };
 
   return (
     <div className="min-h-screen grid grid-rows-[auto,1fr]">
@@ -81,11 +102,23 @@ export default function ProviderPerplexity() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={clearConversation}
+                    onClick={() => {
+                      clearConversation();
+                      setShowTemplates(true);
+                    }}
                     disabled={conversation.messages.length === 0}
                   >
                     Clear Chat
                   </Button>
+                  {conversation.messages.length > 0 && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowTemplates(!showTemplates)}
+                    >
+                      {showTemplates ? "Hide" : "Show"} Templates
+                    </Button>
+                  )}
                   <Button variant="outline" size="sm" asChild>
                     <Link to="/">Back to Home</Link>
                   </Button>
@@ -106,6 +139,15 @@ export default function ProviderPerplexity() {
                 </p>
               </CardContent>
             </Card>
+          </section>
+        )}
+
+        {showTemplates && isAvailable && perplexityQueries.length > 0 && (
+          <section className="mx-auto max-w-4xl mb-6">
+            <TemplatesGrid
+              queries={perplexityQueries}
+              onSelect={handleTemplateSelect}
+            />
           </section>
         )}
 

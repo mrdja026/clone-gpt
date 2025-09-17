@@ -2,6 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { streamText } from "ai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { getEffectiveOllamaBaseUrl } from "../utils/ollama-proxy";
+import { createToolCallSystemPrompt } from "../utils/json-tool-parser";
 
 import { ChatRequestDto, ChatResponseDto } from "./dto/chat.dto";
 
@@ -18,16 +19,24 @@ const modelName = process.env.MODEL_NAME || "llama3.1:latest";
 export class ChatService {
   private readonly logger = new Logger(ChatService.name);
 
+  private readonly availableTools = [
+    "fetch_perplexity_data",
+    "get_jira_issue",
+    "list_jira_issues",
+  ];
+
   async streamResponse(chatRequest: ChatRequestDto): Promise<any> {
     const { messages, systemPrompt } = chatRequest;
 
     this.logger.log(`Processing chat request with ${messages.length} messages`);
 
+    // Use JSON tool calling system prompt for OSS models
+    const enhancedSystemPrompt =
+      systemPrompt || createToolCallSystemPrompt(this.availableTools);
+
     const result = streamText({
       model: ollama.chatModel(modelName), // Use chatModel for OpenAI chat completions format
-      system:
-        systemPrompt ||
-        "You are a helpful assistant that provides detailed analysis and suggestions for project management queries.",
+      system: enhancedSystemPrompt,
       messages: messages.map((msg) => ({
         role: msg.role,
         content: msg.content,
@@ -45,11 +54,13 @@ export class ChatService {
       `Processing sync chat request with ${messages.length} messages`,
     );
 
+    // Use JSON tool calling system prompt for OSS models
+    const enhancedSystemPrompt =
+      systemPrompt || createToolCallSystemPrompt(this.availableTools);
+
     const result = await streamText({
       model: ollama.chatModel(modelName),
-      system:
-        systemPrompt ||
-        "You are a helpful assistant that provides detailed analysis and suggestions for project management queries.",
+      system: enhancedSystemPrompt,
       messages: messages.map((msg) => ({
         role: msg.role,
         content: msg.content,

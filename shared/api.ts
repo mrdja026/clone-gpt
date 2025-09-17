@@ -76,3 +76,21 @@ export interface JiraTicket {
   description: string;
   blockers?: string[];
 }
+
+// Lane B types for query interpretation
+export interface LaneBQueryRequest {
+  query: string;
+  context?: Record<string, any>;
+}
+
+export interface LaneBToolCall {
+  name: string;
+  arguments: Record<string, any>;
+}
+
+export interface LaneBResponse {
+  type: "tool" | "chat";
+  source: "gemma" | "matcher" | "chat";
+  tool_calls?: LaneBToolCall[];
+  chat?: string;
+}

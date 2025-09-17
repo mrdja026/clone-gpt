@@ -1472,6 +1472,7 @@ The forward-only MCP architecture is **fully operational** and ready for product
   - Executes matched MCP actions
   - Displays a formatted MCP section in the chat
   - Sends a capped “Retrieved Data (JSON)” block to the LLM, reducing hallucinations
+- Lane B service successfully detects JIRA ticket patterns (e.g., SCRUM-42) and returns appropriate tool calls via fallback matcher.
 
 **Issues observed**
 
@@ -1483,12 +1484,17 @@ The forward-only MCP architecture is **fully operational** and ready for product
 - LLM streaming failed locally due to missing Ollama model:
   - Error: `model "qwen2" not found, try pulling it first`.
   - Fix: either pull the model in Ollama or set `MODEL_NAME` to an installed one (e.g., `llama3.1:latest`).
+- Lane B ConfigService error:
+  - Error: `Cannot read properties of undefined (reading 'get')` in LaneBService.
+  - Cause: ConfigService is undefined when service is instantiated.
+  - Status: Lane B detection and fallback matcher work correctly despite this error.
 
 **Validated logs (samples)**
 
 - Bridge: `[BRIDGE] tools/call completed in 19685ms` and SLO warning when >5s.
 - MCP: `Tool called: fetch_perplexity_data { query, domain, recency, max_results }`.
 - Nest: `MCP_REQUEST { path: '/api/mcp/tool', method: 'POST', durationMs: 19707 }` → then either success or a clear error.
+- Lane B: `[LaneBController] Fallback Lane B response: {"type":"tool","source":"matcher","tool_calls":[{"name":"fetch_ticket","arguments":{"ticketKey":"SCRUM-42"}}]}` → successfully detected JIRA ticket pattern.
 
 **Immediate actions**
 

@@ -2,6 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import type { Conversation, Message } from "@/components/chat/types";
 import { matchQuery, formatMCPResponse } from "@/lib/query-matcher";
 import { mcpClient } from "@/lib/mcp-client";
+import {
+  parseToolCallResponse,
+  convertToolCallsToMCPActions,
+} from "@/lib/json-tool-handler";
 
 const STORAGE_KEY = "jira-gpt-conversations";
 const STORAGE_ACTIVE = "jira-gpt-active";
@@ -293,15 +297,63 @@ export function useConversations() {
     const currentConv = conversations.find((c) => c.id === activeId);
     const conversationHistory = currentConv ? currentConv.messages : [];
     let llmResponse = "";
+    let additionalMcpResults = "";
+
     try {
       const fullAnswer = await callModelStreaming(
         enhancedPrompt,
         conversationHistory,
-        (chunk: string) => {
+        async (chunk: string) => {
           llmResponse += chunk;
-          const currentContent = mcpResults
-            ? `${mcpResults}\n\n**Analysis:**\n`
-            : "";
+
+          // Check if the current response contains JSON tool calls
+          const parsed = parseToolCallResponse(llmResponse);
+          if (parsed.isToolCall && parsed.toolCalls.length > 0) {
+            // Execute tool calls immediately
+            const mcpActions = convertToolCallsToMCPActions(parsed.toolCalls);
+
+            setConversations((prev) =>
+              prev.map((c) =>
+                c.id === activeId
+                  ? {
+                      ...c,
+                      messages: c.messages.map((m) =>
+                        m.id === botMessageId
+                          ? { ...m, content: "🔍 Executing tool calls..." }
+                          : m,
+                      ),
+                    }
+                  : c,
+              ),
+            );
+
+            try {
+              const toolPromises = mcpActions.map(async (action) => {
+                const response = await mcpClient.executeAction(action);
+                const responseText =
+                  ("content" in response
+                    ? response.content?.[0]?.text
+                    : response.contents?.[0]?.text) || "No data returned";
+                return formatMCPResponse(action, responseText);
+              });
+
+              const toolResults = await Promise.all(toolPromises);
+              additionalMcpResults = toolResults.join("\n\n");
+
+              // Clear LLM response since we got tool calls
+              llmResponse = "";
+            } catch (error) {
+              additionalMcpResults = `❌ Tool execution failed: ${error instanceof Error ? error.message : "Unknown error"}`;
+              llmResponse = "";
+            }
+          }
+
+          const currentContent =
+            mcpResults +
+            (additionalMcpResults ? "\n\n" + additionalMcpResults : "")
+              ? `${mcpResults}${additionalMcpResults ? "\n\n" + additionalMcpResults : ""}\n\n**Analysis:**\n`
+              : "";
+
           setConversations((prev) =>
             prev.map((c) =>
               c.id === activeId
@@ -318,8 +370,11 @@ export function useConversations() {
           );
         },
       );
-      const finalContent = mcpResults
-        ? `${mcpResults}\n\n**Analysis:**\n${fullAnswer}`
+      const allMcpResults =
+        mcpResults +
+        (additionalMcpResults ? "\n\n" + additionalMcpResults : "");
+      const finalContent = allMcpResults
+        ? `${allMcpResults}\n\n**Analysis:**\n${fullAnswer}`
         : fullAnswer;
       setConversations((prev) =>
         prev.map((c) =>
@@ -334,8 +389,11 @@ export function useConversations() {
         ),
       );
     } catch (error) {
+      const allMcpResults =
+        mcpResults +
+        (additionalMcpResults ? "\n\n" + additionalMcpResults : "");
       const fallbackContent =
-        mcpResults ||
+        allMcpResults ||
         `❌ Failed to process request: ${error instanceof Error ? error.message : "Unknown error"}`;
       setConversations((prev) =>
         prev.map((c) =>
