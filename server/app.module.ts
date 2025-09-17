@@ -9,6 +9,7 @@ import { QueryTemplatesController } from "./controllers/query-templates.controll
 import { McpModule } from "./mcp/mcp.module";
 import { JiraController } from "./controllers/jira.controller";
 import { LaneBModule } from "./services/lane-b/lane-b.module";
+import { LaneCModule } from "./services/lane-c/lane-c.module";
 
 @Module({
   imports: [
@@ -18,9 +19,10 @@ import { LaneBModule } from "./services/lane-b/lane-b.module";
     }),
     SupabaseModule,
     ServicesModule,
-    ChatModule,
     McpModule,
     LaneBModule,
+    LaneCModule,
+    ChatModule,
   ],
   controllers: [
     DemoController,

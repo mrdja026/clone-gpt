@@ -537,11 +537,120 @@ Key files:
 
 ## API Endpoints
 
+### Standard Chat Endpoints
+
 - `GET /api/ping` - Health check
 - `POST /api/chat` - Non-streaming chat completion
 - `POST /api/chat/stream` - Streaming chat completion
 - `POST /api/chat/persistent` - Chat with database persistence
 - `POST /api/chat/persistent/stream` - Streaming chat with persistence
+
+### Third Lane Endpoints (Sequential AI Processing)
+
+The Third Lane architecture provides intelligent, sequential AI processing with specialized models:
+
+- `GET /api/third-lane/health` - Third Lane system health check
+- `POST /api/third-lane/query` - Full Third Lane processing with chat history
+- `POST /api/third-lane/simple-query` - Simple Third Lane query processing
+- `POST /api/chat/third-lane` - Third Lane integrated with chat system
+- `POST /api/chat/third-lane/simple` - Simple Third Lane chat integration
+
+#### Third Lane Flow:
+
+1. **Lane A**: Intent detection and pattern matching (lightweight model)
+2. **Lane B**: Deterministic MCP data fetching (no AI inference)
+3. **Lane C**: Deep analysis with `llama-3.1-8b-tool:latest` (specialized analysis)
+
+#### Example Usage:
+
+```bash
+# Test Third Lane health
+curl http://localhost:3001/api/third-lane/health
+
+# Simple query
+curl -X POST http://localhost:3001/api/chat/third-lane/simple \
+  -H "Content-Type: application/json" \
+  -d '{"query": "What is SCRUM-8?"}'
+
+# Full query with context
+curl -X POST http://localhost:3001/api/third-lane/query \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "Analyze the current sprint",
+    "chatId": "chat-123",
+    "chatHistory": [
+      {"role": "user", "content": "Hello"},
+      {"role": "assistant", "content": "Hi there!"}
+    ]
+  }'
+```
+
+#### Third Lane Response Format:
+
+```typescript
+{
+  "response": "Analysis of the sprint data...",
+  "mode": "data_analysis" | "general_chat",
+  "analysis": {
+    "insights": ["Key finding 1", "Key finding 2"],
+    "recommendations": ["Action 1", "Action 2"],
+    "confidence": 0.85
+  },
+  "rawData": { /* MCP data */ },
+  "chatId": "chat-123"
+}
+```
+
+### Third Lane Setup (Multi-Model Architecture)
+
+The Third Lane architecture uses **two specialized Ollama models** on different ports for optimal performance:
+
+#### Model Configuration:
+
+```bash
+# Terminal 1: Lane A (Intent Detection)
+$env:OLLAMA_HOST="127.0.0.1:123"
+ollama serve
+ollama run gemma-fc-test:latest
+
+# Terminal 2: Lane C (Analysis)
+$env:OLLAMA_HOST="127.0.0.1:124"
+ollama serve
+ollama run qwen2.5:7b
+```
+
+#### Environment Setup:
+
+```bash
+# Copy and configure environment
+cp env.example .env
+
+# Key Third Lane variables:
+LANE_A_HOST=127.0.0.1:123      # Gemma for fuzzy detection
+LANE_C_HOST=127.0.0.1:124      # Qwen2.5 for analysis
+MODEL_NAME=qwen2.5:7b          # Lane C model
+GEMMA_MODEL=gemma-fc-test:latest # Lane A model
+```
+
+#### Testing:
+
+```bash
+# Test model connectivity
+node scripts/test-third-lane-models.js
+
+# Test Third Lane integration
+node scripts/test-third-lane.js
+
+# Setup helper script
+./scripts/setup-third-lane.ps1
+```
+
+#### Architecture Benefits:
+
+- **VRAM Efficiency**: 8GB peak (50% reduction)
+- **Specialized Models**: Each optimized for its task
+- **Sequential Processing**: Lane A → B → C flow
+- **Intelligent Fallback**: Data analysis ↔ General chat
 
 ## Development Commands
 
