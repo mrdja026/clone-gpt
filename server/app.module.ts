@@ -8,8 +8,10 @@ import { ChatsController } from "./controllers/chats.controller";
 import { QueryTemplatesController } from "./controllers/query-templates.controller";
 import { McpModule } from "./mcp/mcp.module";
 import { JiraController } from "./controllers/jira.controller";
+import { JiraProjectTreeService } from "./services/jira-project-tree.service";
 import { LaneBModule } from "./services/lane-b/lane-b.module";
 import { LaneCModule } from "./services/lane-c/lane-c.module";
+import { ReasoningModule } from "./services/reasoning/reasoning.module";
 
 @Module({
   imports: [
@@ -22,6 +24,7 @@ import { LaneCModule } from "./services/lane-c/lane-c.module";
     McpModule,
     LaneBModule,
     LaneCModule,
+    ReasoningModule,
     ChatModule,
   ],
   controllers: [
@@ -30,6 +33,6 @@ import { LaneCModule } from "./services/lane-c/lane-c.module";
     QueryTemplatesController,
     JiraController,
   ],
-  providers: [],
+  providers: [JiraProjectTreeService],
 })
 export class AppModule {}

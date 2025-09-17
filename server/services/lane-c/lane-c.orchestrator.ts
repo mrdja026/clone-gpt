@@ -8,9 +8,12 @@ import {
   ThirdLaneRequest,
   ThirdLaneResponse,
   ChatMessage,
+  ReasoningContext,
 } from "@shared/api";
 import { LaneBService } from "../lane-b/lane-b.service";
 import { LaneCService } from "./lane-c.service";
+import { ReasoningService } from "../reasoning/reasoning.service";
+import { McpService } from "../../mcp/mcp.service";
 
 @Injectable()
 export class ThirdLaneOrchestrator {
@@ -20,6 +23,7 @@ export class ThirdLaneOrchestrator {
     private configService: ConfigService,
     private laneBService: LaneBService,
     private laneCService: LaneCService,
+    private mcpService: McpService,
   ) {
     this.logger.log("ThirdLaneOrchestrator initialized");
   }
@@ -55,7 +59,13 @@ export class ThirdLaneOrchestrator {
       );
 
       // Format final response
-      return this.formatResponse(laneCOutput, laneBOutput, request.chatId);
+      return this.formatResponse(
+        laneCOutput,
+        laneBOutput,
+        request.chatId,
+        laneAOutput,
+        request.userQuery,
+      );
     } catch (error) {
       this.logger.error(`Error in Third Lane processing: ${error.message}`);
       return this.createErrorResponse(error.message, request.chatId);
@@ -188,110 +198,40 @@ export class ThirdLaneOrchestrator {
   }
 
   /**
-   * Execute tool calls to fetch actual data
-   * This would integrate with your MCP server
+   * Execute tool calls using actual MCP service
+   * Integrates with barebone MCP server for real data
    */
   private async executeToolCalls(toolCalls: any[]): Promise<any> {
-    // This is a placeholder - you would integrate with your actual MCP server
-    // For now, return mock data based on tool call type
-
+    this.logger.log(`Executing ${toolCalls.length} tool calls via MCP service`);
     const results: any[] = [];
 
     for (const toolCall of toolCalls) {
       try {
-        switch (toolCall.name) {
-          case "fetch_ticket":
-            const ticketData = await this.fetchJiraTicket(
-              toolCall.arguments.ticketKey,
-            );
-            results.push(ticketData);
-            break;
+        this.logger.log(
+          `Calling MCP tool: ${toolCall.name} with args: ${JSON.stringify(toolCall.arguments)}`,
+        );
 
-          case "fetch_perplexity_data":
-            const searchData = await this.fetchPerplexityData(
-              toolCall.arguments,
-            );
-            results.push(searchData);
-            break;
+        // Use actual MCP service instead of mock data
+        const result = await this.mcpService.callTool(
+          toolCall.name,
+          toolCall.arguments,
+        );
 
-          default:
-            this.logger.warn(`Unknown tool call: ${toolCall.name}`);
-        }
+        this.logger.log(`MCP tool ${toolCall.name} completed successfully`);
+        results.push(result);
       } catch (error) {
-        this.logger.error(`Tool call execution failed: ${error.message}`);
+        this.logger.error(
+          `MCP tool call failed: ${toolCall.name} - ${error.message}`,
+        );
         results.push({
           error: `Failed to execute ${toolCall.name}: ${error.message}`,
+          toolName: toolCall.name,
+          arguments: toolCall.arguments,
         });
       }
     }
 
     return results.length === 1 ? results[0] : results;
-  }
-
-  /**
-   * Mock JIRA ticket fetching - replace with actual MCP integration
-   */
-  private async fetchJiraTicket(ticketKey: string): Promise<any> {
-    // This should be replaced with actual MCP server call
-    this.logger.log(`Mock fetching JIRA ticket: ${ticketKey}`);
-
-    // Simulate API delay
-    await new Promise((resolve) => setTimeout(resolve, 100));
-
-    return {
-      ticket: {
-        key: ticketKey,
-        summary: `Mock ticket summary for ${ticketKey}`,
-        status: "In Progress",
-        assignee: "John Doe",
-        priority: "High",
-        description:
-          "This is a mock ticket description. In real implementation, this would come from your JIRA MCP server.",
-        created: new Date().toISOString(),
-        updated: new Date().toISOString(),
-      },
-      metadata: {
-        fetchedAt: new Date().toISOString(),
-        source: "JIRA MCP Server",
-      },
-    };
-  }
-
-  /**
-   * Mock Perplexity data fetching - replace with actual MCP integration
-   */
-  private async fetchPerplexityData(args: any): Promise<any> {
-    // This should be replaced with actual MCP server call
-    this.logger.log(`Mock fetching Perplexity data: ${JSON.stringify(args)}`);
-
-    // Simulate API delay
-    await new Promise((resolve) => setTimeout(resolve, 150));
-
-    return {
-      search: {
-        query: args.query || args.user || "general search",
-        results: [
-          {
-            title: "Mock Search Result 1",
-            content:
-              "This is mock search content. In real implementation, this would come from your Perplexity MCP server.",
-            url: "https://example.com/result1",
-            relevance: 0.95,
-          },
-          {
-            title: "Mock Search Result 2",
-            content: "Additional mock content for demonstration purposes.",
-            url: "https://example.com/result2",
-            relevance: 0.87,
-          },
-        ],
-        timestamp: new Date().toISOString(),
-      },
-      metadata: {
-        fetchedAt: new Date().toISOString(),
-        source: "Perplexity MCP Server",
-      },
-    };
   }
 
   /**
@@ -301,6 +241,8 @@ export class ThirdLaneOrchestrator {
     laneCOutput: LaneCOutput,
     laneBOutput: LaneBOutput,
     chatId?: string,
+    laneAOutput?: LaneAOutput,
+    userQuery?: string,
   ): ThirdLaneResponse {
     const response: ThirdLaneResponse = {
       response: laneCOutput.analysis,
@@ -316,6 +258,26 @@ export class ThirdLaneOrchestrator {
         confidence: laneCOutput.confidence,
       };
       response.rawData = laneBOutput;
+    }
+
+    // Add reasoning context for transitioning to reasoning mode
+    if (
+      laneAOutput &&
+      userQuery &&
+      (laneCOutput.mode === "data_analysis" ||
+        laneBOutput.metadata.status === "success")
+    ) {
+      const sessionId = ReasoningService.generateSessionId();
+      response.reasoningContext = {
+        originalQuery: userQuery,
+        combinedData: {
+          laneAOutput,
+          laneBOutput,
+          laneCOutput,
+        },
+        timestamp: Date.now(),
+        sessionId,
+      };
     }
 
     return response;

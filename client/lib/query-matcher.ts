@@ -57,16 +57,30 @@ function extractTicketIds(text: string): string[] {
 
 /**
  * Extract project IDs from text (project names, keys)
- * Looks for patterns like "project SCRUM", "in PROJECT-X", etc.
+ * Looks for patterns like "project SCRUM", "for WEB", "WEB tree", etc.
  */
 function extractProjectIds(text: string): string[] {
-  const projectPattern = /\b(?:project|in)\s+([A-Z][A-Z0-9-]*)\b/gi;
-  const matches = [];
-  let match;
-  while ((match = projectPattern.exec(text)) !== null) {
-    matches.push(match[1]);
+  const patterns = [
+    // "project WEB", "in SCRUM"
+    /\b(?:project|in)\s+([A-Z][A-Z0-9-]*)\b/gi,
+    // "for WEB", "of SCRUM"
+    /\b(?:for|of)\s+([A-Z][A-Z0-9-]*)\b/gi,
+    // "WEB project", "WEB tree", "WEB with"
+    /\b([A-Z][A-Z0-9-]*)\s+(?:project|tree|with|hierarchy|breakdown)\b/gi,
+  ];
+
+  const matches = new Set<string>();
+  for (const pattern of patterns) {
+    let match;
+    while ((match = pattern.exec(text)) !== null) {
+      const projectKey = match[1];
+      // Validate it looks like a project key (2+ chars, starts with letter)
+      if (projectKey.length >= 2 && /^[A-Z]/.test(projectKey)) {
+        matches.add(projectKey);
+      }
+    }
   }
-  return matches;
+  return Array.from(matches);
 }
 
 /**
@@ -84,6 +98,57 @@ function extractTeamNames(text: string): string[] {
   const teamPattern = /\b(?:team\s+)?([A-Z][A-Z0-9-]*|[A-Z][a-z]+)\b/gi;
   const matches = text.match(teamPattern) || [];
   return matches.map((m) => m.replace(/^team\s+/i, ""));
+}
+
+/**
+ * Extract board types from text (scrum, kanban)
+ */
+function extractBoardTypes(text: string): string[] {
+  const boardTypePattern = /\b(scrum|kanban)\b/gi;
+  const matches = text.match(boardTypePattern) || [];
+  return matches.map((type) => type.toLowerCase());
+}
+
+/**
+ * Extract board names from text (e.g., "board MyBoard", "MyBoard board")
+ */
+function extractBoardNames(text: string): string[] {
+  const boardNamePatterns = [
+    /\bboard\s+([A-Za-z0-9][A-Za-z0-9\s_-]*)/gi, // "board MyBoard"
+    /\b([A-Za-z0-9][A-Za-z0-9\s_-]*)\s+board\b/gi, // "MyBoard board"
+  ];
+
+  const names = [];
+  for (const pattern of boardNamePatterns) {
+    let match;
+    while ((match = pattern.exec(text)) !== null) {
+      const name = match[1].trim();
+      if (name && !names.includes(name)) {
+        names.push(name);
+      }
+    }
+  }
+  return names;
+}
+
+/**
+ * Detect search intent vs specific item intent
+ */
+function extractSearchIntent(text: string): boolean {
+  const searchKeywords = [
+    "search",
+    "find",
+    "list",
+    "show",
+    "get",
+    "all",
+    "browse",
+    "explore",
+    "lookup",
+    "discover",
+  ];
+  const lowerText = text.toLowerCase();
+  return searchKeywords.some((keyword) => lowerText.includes(keyword));
 }
 
 /**
@@ -314,9 +379,129 @@ export function matchQuery(userInput: string): QueryMatch {
     }
   }
 
+  // Pattern 1.5: Board-specific queries (NEW - high priority)
+  if (
+    input.includes("board") ||
+    input.includes("kanban") ||
+    input.includes("scrum")
+  ) {
+    const boardTypes = extractBoardTypes(originalInput);
+    const projectIds = extractProjectIds(originalInput);
+    const boardNames = extractBoardNames(originalInput);
+    const hasSearchIntent = extractSearchIntent(originalInput);
+
+    // Combined project + board search
+    if (input.includes("project") && hasSearchIntent) {
+      return {
+        isMatch: true,
+        confidence: 0.95,
+        originalQuery: userInput,
+        mcpActions: [
+          {
+            toolName: "search_projects_with_boards",
+            args: {
+              ...(projectIds.length > 0 && { projectQuery: projectIds[0] }),
+              ...(boardTypes.length > 0 && { boardType: boardTypes[0] }),
+              projectStatus: "live",
+              includeConfig: true,
+              includeActiveSprints: true,
+            },
+            description: `Finding projects with their boards${projectIds.length > 0 ? ` for project ${projectIds[0]}` : ""}${boardTypes.length > 0 ? ` (${boardTypes[0]} boards)` : ""}`,
+            type: "tool",
+          },
+        ],
+        enhancedPrompt: `Based on the projects and boards data, provide a comprehensive overview of the project structure and available boards. Focus on active sprints and board configurations.`,
+      };
+    }
+
+    // Board-only search
+    return {
+      isMatch: true,
+      confidence: 0.9,
+      originalQuery: userInput,
+      mcpActions: [
+        {
+          toolName: "search_jira_boards",
+          args: {
+            ...(boardNames.length > 0 && { name: boardNames[0] }),
+            ...(boardTypes.length > 0 && { type: boardTypes[0] }),
+            ...(projectIds.length > 0 && { projectKeyOrId: projectIds[0] }),
+            includeConfig: true,
+            includeActiveSprints: true,
+            includeProjects: true,
+            maxResults: 10,
+          },
+          description: `Searching for boards${boardNames.length > 0 ? ` named "${boardNames[0]}"` : ""}${boardTypes.length > 0 ? ` (${boardTypes[0]} type)` : ""}${projectIds.length > 0 ? ` in project ${projectIds[0]}` : ""}`,
+          type: "tool",
+        },
+      ],
+      enhancedPrompt: `Based on the board search results, provide insights about the available boards, their configurations, active sprints, and associated projects. Include practical details for team planning.`,
+    };
+  }
+
+  // Pattern 1.6: Project tree queries (NEW - high priority)
+  if (
+    (input.includes("project") &&
+      (input.includes("tree") ||
+        input.includes("hierarchy") ||
+        input.includes("structure"))) ||
+    (input.includes("epic") &&
+      (input.includes("children") ||
+        input.includes("subtask") ||
+        input.includes("breakdown"))) ||
+    input.includes("project breakdown") ||
+    input.includes("epic breakdown")
+  ) {
+    const projectIds = extractProjectIds(originalInput);
+    const projectKey = projectIds.length > 0 ? projectIds[0] : "WEB"; // Default fallback
+
+    return {
+      isMatch: true,
+      confidence: 0.96,
+      originalQuery: userInput,
+      mcpActions: [
+        {
+          toolName: "fetch_jira_project_tree",
+          args: {
+            projectKeyOrId: projectKey,
+            pageSize: 100,
+          },
+          description: `Fetching complete project tree for ${projectKey} (Project → Epics → Issues → Subtasks)`,
+          type: "tool",
+        },
+      ],
+      enhancedPrompt: `Based on the 3-level project tree data for ${projectKey}, provide a comprehensive analysis of the project structure. Include epic progress, issue distribution, story points, and team workload insights. Focus on actionable project management insights.`,
+    };
+  }
+
   // Pattern 2: Project-specific queries - uses "project" keyword to extract project ID
   if (input.includes("project")) {
     const projectIds = extractProjectIds(originalInput);
+    const hasSearchIntent = extractSearchIntent(originalInput);
+
+    // Enhanced: Use new search tool for search intent
+    if (hasSearchIntent) {
+      return {
+        isMatch: true,
+        confidence: 0.92,
+        originalQuery: userInput,
+        mcpActions: [
+          {
+            toolName: "search_jira_projects",
+            args: {
+              ...(projectIds.length > 0 && { query: projectIds[0] }),
+              status: "live",
+              maxResults: 15,
+            },
+            description: `Searching for projects${projectIds.length > 0 ? ` matching "${projectIds[0]}"` : ""}`,
+            type: "tool",
+          },
+        ],
+        enhancedPrompt: `Based on the project search results, provide a comprehensive overview of available projects. Include project types, status, and key details for team planning.`,
+      };
+    }
+
+    // Legacy: Specific project lookup (keep for backward compatibility)
     if (projectIds.length > 0) {
       return {
         isMatch: true,
@@ -333,20 +518,23 @@ export function matchQuery(userInput: string): QueryMatch {
         enhancedPrompt: `You are in strict analysis mode. Only summarize what is present in 'Retrieved Data' from MCP for project ${projectIds[0]}. Do not infer or hallucinate beyond those fields.`,
       };
     } else {
-      // General project query without specific ID
+      // General project query without specific ID - use new search tool
       return {
         isMatch: true,
-        confidence: 0.8,
+        confidence: 0.85,
         originalQuery: userInput,
         mcpActions: [
           {
-            resourceUri: "mcp://local-mcp-server/jira/projects",
-            args: {},
-            description: "Fetching all available projects (SCRUM, HWP, etc.)",
-            type: "resource",
+            toolName: "search_jira_projects",
+            args: {
+              status: "live",
+              maxResults: 10,
+            },
+            description: "Searching for all available projects",
+            type: "tool",
           },
         ],
-        enhancedPrompt: `You are in strict analysis mode. Only summarize what is present in 'Retrieved Data' from MCP about available projects. Do not infer or hallucinate beyond those fields.`,
+        enhancedPrompt: `Based on the project search results, provide an overview of all available projects with their key characteristics and purposes.`,
       };
     }
   }
@@ -678,6 +866,75 @@ ${data.activeSprints
         }
         return `**Sprint Summary:** ${data.summary || "No active sprints found"}`;
 
+      case "search_jira_projects":
+        // Handle project search results
+        if (data.error) {
+          return `⚠️ **Project Search Error:** ${data.error}`;
+        }
+
+        // Parse the formatted response text from our MCP server
+        if (typeof data === "string") {
+          return data; // Already formatted by server
+        }
+
+        // Fallback: format raw project array
+        if (Array.isArray(data)) {
+          return `**🏗️ Found ${data.length} Projects:**\n${data
+            .map(
+              (project) =>
+                `• **${project.key}** - ${project.name}\n  📂 Type: ${project.projectTypeKey || "Unknown"}\n  📊 Category: ${project.category?.name || "None"}`,
+            )
+            .join("\n\n")}`;
+        }
+
+        return `**Project Search Results:**\n\`\`\`json\n${JSON.stringify(data, null, 2)}\n\`\`\``;
+
+      case "search_jira_boards":
+        // Handle board search results
+        if (data.error) {
+          return `⚠️ **Board Search Error:** ${data.error}`;
+        }
+
+        // Parse the formatted response text from our MCP server
+        if (typeof data === "string") {
+          return data; // Already formatted by server
+        }
+
+        // Fallback: format raw board array
+        if (Array.isArray(data)) {
+          return `**📋 Found ${data.length} Boards:**\n${data
+            .map(
+              (board) =>
+                `• **${board.name}** (${board.type})\n  🎯 Active Sprints: ${board.activeSprints?.length || 0}\n  🏗️ Projects: ${board.projects?.length || 0}\n  ⚙️ Columns: ${board.config?.columns?.length || "Unknown"}`,
+            )
+            .join("\n\n")}`;
+        }
+
+        return `**Board Search Results:**\n\`\`\`json\n${JSON.stringify(data, null, 2)}\n\`\`\``;
+
+      case "search_projects_with_boards":
+        // Handle combined project+board search results
+        if (data.error) {
+          return `⚠️ **Combined Search Error:** ${data.error}`;
+        }
+
+        // Parse the formatted response text from our MCP server
+        if (typeof data === "string") {
+          return data; // Already formatted by server
+        }
+
+        // Fallback: format raw combined array
+        if (Array.isArray(data)) {
+          return `**🏗️ Found ${data.length} Projects with Boards:**\n${data
+            .map(
+              (item) =>
+                `• **${item.project.key}** - ${item.project.name}\n  📋 Boards: ${item.boards.length}\n  ${item.boards.map((b) => `    - ${b.name} (${b.type})`).join("\n  ")}`,
+            )
+            .join("\n\n")}`;
+        }
+
+        return `**Combined Search Results:**\n\`\`\`json\n${JSON.stringify(data, null, 2)}\n\`\`\``;
+
       case "fetch_perplexity_data":
         // Handle Perplexity search results
         if (data.error) {
@@ -711,6 +968,54 @@ ${data.activeSprints
         }
 
         return formatted;
+
+      case "fetch_jira_project_tree":
+        // Handle JIRA project tree results
+        if (data.error) {
+          return `⚠️ **Project Tree Error:** ${data.error}`;
+        }
+
+        if (data.project && data.epics) {
+          const stats = data.stats || {};
+          let formatted = `**🌳 Project Tree: ${data.project}**\n\n`;
+
+          formatted += `**📊 Project Statistics:**\n`;
+          formatted += `• **Epics:** ${stats.epics || 0}\n`;
+          formatted += `• **Issues:** ${stats.children || 0}\n`;
+          formatted += `• **Subtasks:** ${stats.subtasks || 0}\n`;
+          formatted += `• **Levels:** ${data.levels || 3}\n\n`;
+
+          if (data.epics && data.epics.length > 0) {
+            formatted += `**🎯 Epic Breakdown:**\n`;
+            data.epics.slice(0, 5).forEach((epic: any) => {
+              const childCount = epic.children?.length || 0;
+              const subtaskCount =
+                epic.children?.reduce(
+                  (sum: number, child: any) =>
+                    sum + (child.subtasks?.length || 0),
+                  0,
+                ) || 0;
+
+              formatted += `• **${epic.key}** - ${epic.summary}\n`;
+              formatted += `  📊 Status: ${epic.status || "Unknown"}\n`;
+              formatted += `  👤 Assignee: ${epic.assignee || "Unassigned"}\n`;
+              formatted += `  📋 Issues: ${childCount} | Subtasks: ${subtaskCount}\n`;
+              if (epic.storyPoints) {
+                formatted += `  🎯 Story Points: ${epic.storyPoints}\n`;
+              }
+              formatted += `\n`;
+            });
+
+            if (data.epics.length > 5) {
+              formatted += `... and ${data.epics.length - 5} more epics\n\n`;
+            }
+          }
+
+          return formatted;
+        }
+
+        // Fallback for unexpected format
+        return `**Project Tree Results:**\n\`\`\`json\n${JSON.stringify(data, null, 2)}\n\`\`\``;
 
       default:
         return `**${action.description}:**\n\`\`\`json\n${JSON.stringify(data, null, 2)}\n\`\`\``;

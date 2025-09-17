@@ -214,7 +214,11 @@ export default function Index() {
         {/* Gradient comes from global.css; Home content below */}
         <HomeLayout>
           <HomeHero />
-          <DeterministicSearchBar onApply={(q) => applyQuery(q)} />
+          <DeterministicSearchBar
+            onApply={(q) => applyQuery(q)}
+            value={searchQuery}
+            onChange={setSearchQuery}
+          />
           <TemplatesGrid
             queries={deterministicQueries}
             onSelect={(t) => setSearchQuery(t)}

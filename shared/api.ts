@@ -316,4 +316,91 @@ export interface ThirdLaneResponse {
   };
   rawData?: LaneBOutput;
   chatId?: string;
+  reasoningContext?: ReasoningContext;
+}
+
+// Reasoning Mode Types
+export interface ReasoningContext {
+  originalQuery: string;
+  combinedData: {
+    laneAOutput: LaneAOutput;
+    laneBOutput: LaneBOutput;
+    laneCOutput: LaneCOutput;
+  };
+  timestamp: number;
+  sessionId: string;
+}
+
+export interface ReasoningModeRequest {
+  message: string;
+  context: ReasoningContext;
+  chatHistory?: ChatMessage[];
+  sessionId: string;
+}
+
+export interface ReasoningModeResponse {
+  response: string;
+  sessionId: string;
+  contextUpdated?: boolean;
+  usage?: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  };
+}
+
+export interface ReasoningSession {
+  id: string;
+  context: ReasoningContext;
+  messages: ChatMessage[];
+  createdAt: number;
+  lastActivity: number;
+}
+
+// JIRA Project Tree types
+export interface JiraProjectTreeIssue {
+  id: string;
+  key: string;
+  summary: string | null;
+  status: string | null;
+  issuetype: string | null;
+  priority: string | null;
+  assignee: string | null;
+  reporter: string | null;
+  storyPoints: number | null;
+  sprint: any;
+  timeTracking: {
+    originalEstimate: string | null;
+    remainingEstimate: string | null;
+    timeSpent: string | null;
+    originalEstimateSeconds: number | null;
+    remainingEstimateSeconds: number | null;
+    timeSpentSeconds: number | null;
+    aggregate: {
+      originalEstimateSeconds: number | null;
+      remainingEstimateSeconds: number | null;
+      timeSpentSeconds: number | null;
+    };
+  };
+  subtasks?: JiraProjectTreeIssue[];
+}
+
+export interface JiraProjectTreeEpic extends JiraProjectTreeIssue {
+  children: JiraProjectTreeIssue[];
+}
+
+export interface JiraProjectTreeResponse {
+  project: string | number;
+  levels: number;
+  stats: {
+    epics: number;
+    children: number;
+    subtasks: number;
+  };
+  epics: JiraProjectTreeEpic[];
+}
+
+export interface JiraProjectTreeRequest {
+  projectKeyOrId: string | number;
+  pageSize?: number;
 }

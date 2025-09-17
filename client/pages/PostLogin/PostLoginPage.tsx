@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import AppHeader from "@/components/AppHeader";
@@ -8,6 +9,11 @@ import Hero from "./components/Hero";
 import ChatPanel from "./components/ChatPanel";
 import ProvidersPanel from "./components/ProvidersPanel";
 import AboutPreview from "./components/AboutPreview";
+import ReasoningMode from "./components/ReasoningMode";
+import { TemplatesGrid } from "@/components/home/TemplatesGrid";
+import { DeterministicSearchBar } from "@/components/home/DeterministicSearchBar";
+import { deterministicQueries } from "@/lib/queries";
+import { Brain } from "lucide-react";
 
 const providers = [
   {
@@ -24,6 +30,7 @@ const providers = [
 
 export default function PostLoginPage() {
   const navigate = useNavigate();
+  const [searchQuery, setSearchQuery] = useState("");
   const {
     pendingPrompt,
     setPendingPrompt,
@@ -33,7 +40,20 @@ export default function PostLoginPage() {
     onBranchFrom,
     onSwitchConversation,
     onCloseConversation,
+    reasoningContext,
+    showReasoningMode,
+    startReasoningMode,
+    closeReasoningMode,
+    isReasoningAvailable,
   } = usePostLogin();
+
+  const handleApplyQuery = (query: string) => {
+    setPendingPrompt(query);
+  };
+
+  const handleTemplateSelect = (template: string) => {
+    setSearchQuery(template);
+  };
 
   return (
     <div className="min-h-screen grid grid-rows-[auto,1fr]">
@@ -61,6 +81,15 @@ export default function PostLoginPage() {
           {/* Left: Hero + Chat */}
           <section data-testid="golden-left" className="space-y-5">
             <Hero />
+
+            {/* Deterministic Search Bar */}
+            <DeterministicSearchBar
+              onApply={handleApplyQuery}
+              value={searchQuery}
+              onChange={setSearchQuery}
+              placeholder="Type to search deterministic queries..."
+            />
+
             <ChatPanel
               pendingPrompt={pendingPrompt}
               setPendingPrompt={setPendingPrompt}
@@ -71,6 +100,42 @@ export default function PostLoginPage() {
               onSwitchConversation={onSwitchConversation}
               onCloseConversation={onCloseConversation}
             />
+
+            {/* Templates Grid */}
+            <div className="mt-8">
+              <TemplatesGrid
+                queries={deterministicQueries}
+                onSelect={handleTemplateSelect}
+              />
+            </div>
+
+            {/* Reasoning Mode Button */}
+            {isReasoningAvailable && (
+              <div className="mt-4 p-4 bg-purple-50 dark:bg-purple-950 rounded-lg border border-purple-200 dark:border-purple-800">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-purple-100 dark:bg-purple-900 flex items-center justify-center">
+                      <Brain className="h-4 w-4 text-purple-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-medium text-purple-900 dark:text-purple-100">
+                        Reasoning Mode Available
+                      </h3>
+                      <p className="text-sm text-purple-700 dark:text-purple-300">
+                        Continue the conversation with deeper analysis and
+                        reasoning
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    onClick={startReasoningMode}
+                    className="bg-purple-600 hover:bg-purple-700 text-white"
+                  >
+                    Enter Reasoning Mode
+                  </Button>
+                </div>
+              </div>
+            )}
           </section>
 
           {/* Right: Context */}
@@ -84,6 +149,14 @@ export default function PostLoginPage() {
           </aside>
         </div>
       </main>
+
+      {/* Reasoning Mode Modal */}
+      {showReasoningMode && reasoningContext && (
+        <ReasoningMode
+          context={reasoningContext}
+          onClose={closeReasoningMode}
+        />
+      )}
     </div>
   );
 }
