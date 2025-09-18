@@ -76,10 +76,11 @@ export class ChatController {
           description: "List Jira projects",
           inputSchema: z.object({}),
           execute: async () => {
-            const resp = await axios.post(`${apiBase}/mcp/resource`, {
-              uri: "mcp://local-mcp-server/jira/projects",
+            const resp = await axios.post(`${apiBase}/mcp/tool`, {
+              name: "search_jira_projects",
+              arguments: { status: "live", maxResults: 50 },
             });
-            const text = resp.data?.contents?.[0]?.text ?? "";
+            const text = resp.data?.content?.[0]?.text ?? "";
             return typeof text === "string" ? text : JSON.stringify(resp.data);
           },
         },
@@ -87,11 +88,17 @@ export class ChatController {
           description: "Get current sprint summary",
           inputSchema: z.object({}),
           execute: async () => {
-            // Use MCP resource for current sprint
-            const resp = await axios.post(`${apiBase}/mcp/resource`, {
-              uri: "mcp://local-mcp-server/jira/current-sprint",
+            // Forward-only MCP: use combined projects+boards search including active sprints
+            const resp = await axios.post(`${apiBase}/mcp/tool`, {
+              name: "search_projects_with_boards",
+              arguments: {
+                includeActiveSprints: true,
+                includeConfig: true,
+                projectStatus: "live",
+                maxResults: 10,
+              },
             });
-            const text = resp.data?.contents?.[0]?.text ?? "";
+            const text = resp.data?.content?.[0]?.text ?? "";
             return typeof text === "string" ? text : JSON.stringify(resp.data);
           },
         },
@@ -184,10 +191,11 @@ export class ChatController {
           description: "List Jira projects",
           inputSchema: z.object({}),
           execute: async () => {
-            const resp = await axios.post(`${apiBase}/mcp/resource`, {
-              uri: "mcp://local-mcp-server/jira/projects",
+            const resp = await axios.post(`${apiBase}/mcp/tool`, {
+              name: "search_jira_projects",
+              arguments: { status: "live", maxResults: 50 },
             });
-            const text = resp.data?.contents?.[0]?.text ?? "";
+            const text = resp.data?.content?.[0]?.text ?? "";
             return typeof text === "string" ? text : JSON.stringify(resp.data);
           },
         },
@@ -195,10 +203,16 @@ export class ChatController {
           description: "Get current sprint summary",
           inputSchema: z.object({}),
           execute: async () => {
-            const resp = await axios.post(`${apiBase}/mcp/resource`, {
-              uri: "mcp://local-mcp-server/jira/current-sprint",
+            const resp = await axios.post(`${apiBase}/mcp/tool`, {
+              name: "search_projects_with_boards",
+              arguments: {
+                includeActiveSprints: true,
+                includeConfig: true,
+                projectStatus: "live",
+                maxResults: 10,
+              },
             });
-            const text = resp.data?.contents?.[0]?.text ?? "";
+            const text = resp.data?.content?.[0]?.text ?? "";
             return typeof text === "string" ? text : JSON.stringify(resp.data);
           },
         },

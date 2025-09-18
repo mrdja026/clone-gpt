@@ -20,7 +20,9 @@ export class LaneCService {
   private readonly logger = new Logger(LaneCService.name);
   private readonly config: LaneCConfig;
 
-  constructor(private configService: ConfigService) {
+  constructor(
+    @Inject(ConfigService) private readonly configService: ConfigService,
+  ) {
     this.logger.log("LaneCService constructor called");
     this.logger.log("ConfigService exists:", !!this.configService);
 
