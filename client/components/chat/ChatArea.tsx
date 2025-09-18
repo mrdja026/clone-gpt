@@ -455,50 +455,54 @@ export function ChatArea({
         </div>
       )}
       <ScrollArea className="flex-1">
-        <div className="p-6 space-y-4">
-          {conversation.messages.length === 0 && (
-            <div className="text-center text-muted-foreground text-sm">
-              Start by selecting a deterministic query on the right or type your
-              own prompt below.
-            </div>
-          )}
-          {conversation.messages.map((m) => (
-            <MessageBubble
-              key={m.id}
-              message={m}
-              onBranch={() => onBranchFrom(m.id)}
-              allowBranch={true}
-            />
-          ))}
-          <div ref={bottomRef} />
+        <div className="p-6">
+          <div className="mx-auto w-full max-w-[72ch] space-y-4">
+            {conversation.messages.length === 0 && (
+              <div className="text-center text-muted-foreground text-sm">
+                Start by selecting a deterministic query on the right or type
+                your own prompt below.
+              </div>
+            )}
+            {conversation.messages.map((m) => (
+              <MessageBubble
+                key={m.id}
+                message={m}
+                onBranch={() => onBranchFrom(m.id)}
+                allowBranch={true}
+              />
+            ))}
+            <div ref={bottomRef} />
+          </div>
         </div>
       </ScrollArea>
       <div className="border-t p-4 bg-background">
-        <div className="flex gap-2 items-end">
-          <Textarea
-            ref={inputRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask anything…"
-            className="min-h-[56px] flex-1"
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                handleSend();
-              }
-            }}
-          />
-          <Button
-            onClick={handleSend}
-            disabled={isSending}
-            className="h-[56px] px-4"
-          >
-            {isSending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <ArrowRight className="h-4 w-4" />
-            )}
-          </Button>
+        <div className="mx-auto w-full max-w-[72ch]">
+          <div className="flex gap-2 items-end">
+            <Textarea
+              ref={inputRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Ask anything…"
+              className="min-h-[56px] flex-1"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSend();
+                }
+              }}
+            />
+            <Button
+              onClick={handleSend}
+              disabled={isSending}
+              className="h-[56px] px-4"
+            >
+              {isSending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <ArrowRight className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
         </div>
       </div>
     </section>
@@ -604,7 +608,7 @@ function MessageBubble({
                 >
                   {part.metadata?.hasMarkdown ? (
                     <div
-                      className="prose prose-sm max-w-none dark:prose-invert"
+                      className="prose prose-sm dark:prose-invert break-words prose-pre:overflow-x-auto prose-code:break-words"
                       dangerouslySetInnerHTML={{
                         __html: formatMarkdown(
                           part.metadata?.isStructured
@@ -614,7 +618,7 @@ function MessageBubble({
                       }}
                     />
                   ) : (
-                    <div className="whitespace-pre-wrap">
+                    <div className="whitespace-pre-wrap break-words">
                       {part.metadata?.isStructured
                         ? formatMessageContent(part.content)
                         : part.content}

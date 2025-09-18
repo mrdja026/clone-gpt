@@ -20,9 +20,7 @@ export class LaneCService {
   private readonly logger = new Logger(LaneCService.name);
   private readonly config: LaneCConfig;
 
-  constructor(
-    @Inject(ConfigService) private readonly configService: ConfigService,
-  ) {
+  constructor(private configService: ConfigService) {
     this.logger.log("LaneCService constructor called");
     this.logger.log("ConfigService exists:", !!this.configService);
 
@@ -53,6 +51,12 @@ export class LaneCService {
       };
     }
 
+    const mode = /\/api\/generate\b/i.test(this.config.ollamaUrl)
+      ? "generate"
+      : "chat";
+    this.logger.debug(
+      `Lane C endpoint mode: ${mode} (${this.config.ollamaUrl})`,
+    );
     this.logger.log(`Lane C configured with model: ${this.config.modelName}`);
   }
 
@@ -206,26 +210,68 @@ Please provide a helpful response to this query.`,
   private async callOllamaModel(
     messages: OllamaChatRequest["messages"],
   ): Promise<string> {
-    const request: OllamaChatRequest = {
-      model: this.config.modelName,
-      messages,
-      stream: false,
-      options: {
-        temperature: this.config.temperature,
-        max_tokens: this.config.maxTokens,
-      },
-    };
-
+    // Detect which endpoint style we are calling
+    const isGenerate = /\/api\/generate\b/i.test(this.config.ollamaUrl);
+    const mode = isGenerate ? "generate" : "chat";
     this.logger.debug(
-      `Calling Ollama model ${this.config.modelName} at ${this.config.ollamaUrl}`,
+      `Calling Ollama (${mode}) model ${this.config.modelName} at ${this.config.ollamaUrl}`,
     );
 
+    // Helper: convert chat messages → single prompt for /api/generate
+    const buildPromptFromMessages = (
+      msgs: OllamaChatRequest["messages"],
+    ): string => {
+      let system = "";
+      const parts: string[] = [];
+      for (const m of msgs) {
+        if (m.role === "system") {
+          system = m.content;
+          continue;
+        }
+        const role = m.role === "assistant" ? "Assistant" : "User";
+        parts.push(`${role}:\n${m.content}`);
+      }
+      const header = system ? `System:\n${system}\n\n` : "";
+      return `${header}${parts.join("\n\n")}`.trim();
+    };
+
     try {
-      const response = await fetch(this.config.ollamaUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(request),
-      });
+      let response: Response;
+
+      if (isGenerate) {
+        // /api/generate expects: { model, prompt, stream }
+        const prompt = buildPromptFromMessages(messages);
+        const body = {
+          model: this.config.modelName,
+          prompt,
+          stream: false,
+          options: {
+            temperature: this.config.temperature,
+            max_tokens: this.config.maxTokens,
+          },
+        };
+        response = await fetch(this.config.ollamaUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+      } else {
+        // /api/chat expects: { model, messages, stream }
+        const body: OllamaChatRequest = {
+          model: this.config.modelName,
+          messages,
+          stream: false,
+          options: {
+            temperature: this.config.temperature,
+            max_tokens: this.config.maxTokens,
+          },
+        };
+        response = await fetch(this.config.ollamaUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+      }
 
       if (!response.ok) {
         throw new Error(
@@ -233,9 +279,23 @@ Please provide a helpful response to this query.`,
         );
       }
 
-      const data: OllamaChatResponse = await response.json();
-      return data.message.content.trim();
-    } catch (error) {
+      const data: any = await response.json();
+
+      // Accept both chat and generate shapes
+      const content =
+        data?.message?.content ??
+        (typeof data?.response === "string" ? data.response : undefined);
+
+      if (typeof content === "string" && content.trim().length > 0) {
+        return content.trim();
+      }
+
+      // If response shape is unexpected, include a small snippet for diagnostics
+      const snippet = JSON.stringify(data)?.slice(0, 300);
+      throw new Error(
+        `Unexpected Ollama response shape (mode=${mode}). Snippet: ${snippet}`,
+      );
+    } catch (error: any) {
       this.logger.error(`Failed to call Ollama model: ${error.message}`);
       throw error;
     }

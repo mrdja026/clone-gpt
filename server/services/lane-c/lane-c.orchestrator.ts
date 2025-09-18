@@ -24,6 +24,7 @@ export class ThirdLaneOrchestrator {
     private laneBService: LaneBService,
     private laneCService: LaneCService,
     private mcpService: McpService,
+    private reasoningService: ReasoningService,
   ) {
     this.logger.log("ThirdLaneOrchestrator initialized");
   }
@@ -59,7 +60,7 @@ export class ThirdLaneOrchestrator {
       );
 
       // Format final response
-      return this.formatResponse(
+      return await this.formatResponse(
         laneCOutput,
         laneBOutput,
         request.chatId,
@@ -237,13 +238,13 @@ export class ThirdLaneOrchestrator {
   /**
    * Format the final response from Lane C output
    */
-  private formatResponse(
+  private async formatResponse(
     laneCOutput: LaneCOutput,
     laneBOutput: LaneBOutput,
     chatId?: string,
     laneAOutput?: LaneAOutput,
     userQuery?: string,
-  ): ThirdLaneResponse {
+  ): Promise<ThirdLaneResponse> {
     const response: ThirdLaneResponse = {
       response: laneCOutput.analysis,
       mode: laneCOutput.mode,
@@ -268,7 +269,7 @@ export class ThirdLaneOrchestrator {
         laneBOutput.metadata.status === "success")
     ) {
       const sessionId = ReasoningService.generateSessionId();
-      response.reasoningContext = {
+      const reasoningContext = {
         originalQuery: userQuery,
         combinedData: {
           laneAOutput,
@@ -278,6 +279,17 @@ export class ThirdLaneOrchestrator {
         timestamp: Date.now(),
         sessionId,
       };
+
+      // Persist/start a reasoning session so the client can continue chatting with Lane C model context
+      try {
+        await this.reasoningService.startReasoningSession(reasoningContext);
+      } catch (e) {
+        this.logger.warn(
+          `Failed to start reasoning session ${sessionId}: ${(e as any)?.message || e}`,
+        );
+      }
+
+      response.reasoningContext = reasoningContext;
     }
 
     return response;
