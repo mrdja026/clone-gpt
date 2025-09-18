@@ -1,4 +1,3 @@
-import { useEffect, useMemo, useState } from "react";
 import type { Message } from "@/components/chat/types";
 import { Link } from "react-router-dom";
 import AppHeader from "@/components/AppHeader";
@@ -7,10 +6,9 @@ import ThemeToggle from "@/components/ThemeToggle";
 import { deterministicQueries } from "@/lib/queries";
 import { HomeLayout } from "@/components/home/HomeLayout";
 import { HomeHero } from "@/components/home/HomeHero";
-import { DeterministicSearchBar } from "@/components/home/DeterministicSearchBar";
-import { TemplatesGrid } from "@/components/home/TemplatesGrid";
 import { ChatShell } from "@/components/chat/ChatShell";
 import { useConversations } from "@/hooks/use-conversations";
+import { jiraQuickActions } from "@/content/jira-placeholders";
 
 function uid(prefix = "id") {
   return `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
@@ -154,17 +152,7 @@ export default function Index() {
     showHomePage,
   } = useConversations();
 
-  const [searchQuery, setSearchQuery] = useState<string>("");
-
   // history provided by hook
-
-  const handleApplyQuery = () => {
-    if (searchQuery.trim()) applyQuery(searchQuery.trim());
-  };
-
-  const handleQuerySelect = (template: string) => {
-    setSearchQuery(template);
-  };
 
   // keep Home button behavior via hook goHome
 
@@ -214,15 +202,41 @@ export default function Index() {
         {/* Gradient comes from global.css; Home content below */}
         <HomeLayout>
           <HomeHero />
-          <DeterministicSearchBar
-            onApply={(q) => applyQuery(q)}
-            value={searchQuery}
-            onChange={setSearchQuery}
-          />
-          <TemplatesGrid
-            queries={deterministicQueries}
-            onSelect={(t) => setSearchQuery(t)}
-          />
+          <section className="mt-6 space-y-6">
+            <div>
+              <h2 className="text-xl font-semibold">Jira Quick Actions</h2>
+              <p className="text-sm text-muted-foreground">
+                Run predefined Jira queries instantly.
+              </p>
+            </div>
+            <div className="space-y-8">
+              {jiraQuickActions.map((group) => (
+                <div key={group.title} className="space-y-3">
+                  <div className="flex items-baseline justify-between">
+                    <h3 className="text-base font-medium">{group.title}</h3>
+                    {group.description ? (
+                      <span className="text-xs text-muted-foreground">
+                        {group.description}
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {group.items.map((item) => (
+                      <button
+                        key={item.label}
+                        type="button"
+                        aria-label={item.ariaLabel ?? item.label}
+                        onClick={() => applyQuery(item.prompt)}
+                        className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
         </HomeLayout>
       </div>
     );
