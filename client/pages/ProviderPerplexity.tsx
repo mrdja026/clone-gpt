@@ -29,6 +29,15 @@ export default function ProviderPerplexity() {
   } = usePerplexityChat();
 
   const [showTemplates, setShowTemplates] = useState(true);
+  // Local Perplexity API key managed in browser storage
+  const [apiKey, setApiKey] = useState<string>(() => {
+    try {
+      return localStorage.getItem("PERPLEXITY_API_KEY") || "";
+    } catch {
+      return "";
+    }
+  });
+  const hasPerplexityKey = apiKey.trim().length > 0;
 
   // Check if Perplexity tool is available on mount
   useEffect(() => {
@@ -125,6 +134,63 @@ export default function ProviderPerplexity() {
                 </div>
               </div>
             </CardHeader>
+          </Card>
+        </section>
+
+        {/* Perplexity API key controls */}
+        <section className="mx-auto max-w-4xl mb-6">
+          <Card className="rounded-3xl">
+            <CardContent className="pt-6">
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <div className="font-medium">Perplexity API Key</div>
+                  <Badge variant={hasPerplexityKey ? "default" : "secondary"}>
+                    {hasPerplexityKey ? "Set" : "Not set"}
+                  </Badge>
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="password"
+                    placeholder="Enter PERPLEXITY_API_KEY"
+                    value={apiKey}
+                    onChange={(e) => setApiKey(e.target.value)}
+                    className="flex-1 px-3 py-2 border rounded-md bg-background"
+                    aria-label="Perplexity API key"
+                  />
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      try {
+                        if (apiKey.trim()) {
+                          localStorage.setItem(
+                            "PERPLEXITY_API_KEY",
+                            apiKey.trim(),
+                          );
+                        }
+                      } catch {}
+                    }}
+                  >
+                    Save
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      try {
+                        localStorage.removeItem("PERPLEXITY_API_KEY");
+                        setApiKey("");
+                      } catch {}
+                    }}
+                  >
+                    Clear
+                  </Button>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  Stored locally and sent as the X-Perplexity-Key header only
+                  when calling the Perplexity tool.
+                </div>
+              </div>
+            </CardContent>
           </Card>
         </section>
 

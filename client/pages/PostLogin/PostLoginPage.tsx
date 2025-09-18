@@ -81,17 +81,6 @@ export default function PostLoginPage() {
           {/* Left: Hero + Chat */}
           <section data-testid="golden-left" className="space-y-5">
             <Hero />
-
-            {/* Deterministic Search Bar */}
-            <DeterministicSearchBar
-              onApply={handleApplyQuery}
-              value={searchQuery}
-              onChange={setSearchQuery}
-              placeholder="Type to search deterministic queries..."
-              suggestions={jiraDeterministicPrompts}
-              autoExecuteOnSelect
-            />
-
             <ChatPanel
               pendingPrompt={pendingPrompt}
               setPendingPrompt={setPendingPrompt}

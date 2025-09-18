@@ -65,6 +65,10 @@ export const jiraQuickActions: QuickActionGroup[] = [
         label: "list boards for project HWP",
         prompt: "list boards for project HWP",
       },
+      {
+        label: "search scrum boards with active sprints",
+        prompt: "search scrum boards with active sprints",
+      },
     ],
   },
   {
@@ -97,6 +101,55 @@ export const jiraQuickActions: QuickActionGroup[] = [
         label: "what can we put in release notes for the last update of SCRUM?",
         prompt:
           "what can we put in release notes for the last update of SCRUM?",
+      },
+    ],
+  },
+  {
+    title: "Project Trees (3‑level)",
+    description:
+      "Complete project hierarchy: Project → Epics → Issues → Subtasks with story points and time tracking",
+    items: [
+      {
+        label: "3‑level tree for WEB",
+        prompt: "Show me the complete 3-level project tree for WEB",
+      },
+      {
+        label: "3‑level tree for SCRUM",
+        prompt: "Show me the complete 3-level project tree for SCRUM",
+      },
+    ],
+  },
+  {
+    title: "Projects + Boards (Combined)",
+    description:
+      "Find projects and their boards together, including board config and active sprints",
+    items: [
+      {
+        label: "Search projects with boards",
+        prompt: "search projects with boards",
+      },
+      {
+        label: "Live projects with scrum boards",
+        prompt: "search live projects with scrum boards",
+      },
+    ],
+  },
+  {
+    title: "Web Research",
+    description:
+      "Perplexity-powered research with optional domain and recency filters",
+    items: [
+      {
+        label: "React 19 release notes (latest)",
+        prompt: "search React 19 release notes latest",
+      },
+      {
+        label: "Explore Perplexity space RAG",
+        prompt: "space named RAG",
+      },
+      {
+        label: "Perplexity user @mrdjan",
+        prompt: "perplexity user @mrdjan",
       },
     ],
   },
