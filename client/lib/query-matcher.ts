@@ -1,5 +1,6 @@
 /**
  * Query Matcher - Detects deterministic queries and maps them to MCP tool calls
+ * Enhanced with Lane B's proven JIRA ticket detection and tool call generation patterns
  */
 
 export interface MCPAction {
@@ -56,16 +57,30 @@ function extractTicketIds(text: string): string[] {
 
 /**
  * Extract project IDs from text (project names, keys)
- * Looks for patterns like "project SCRUM", "in PROJECT-X", etc.
+ * Looks for patterns like "project SCRUM", "for WEB", "WEB tree", etc.
  */
 function extractProjectIds(text: string): string[] {
-  const projectPattern = /\b(?:project|in)\s+([A-Z][A-Z0-9-]*)\b/gi;
-  const matches = [];
-  let match;
-  while ((match = projectPattern.exec(text)) !== null) {
-    matches.push(match[1]);
+  const patterns = [
+    // "project WEB", "in SCRUM"
+    /\b(?:project|in)\s+([A-Z][A-Z0-9-]*)\b/gi,
+    // "for WEB", "of SCRUM"
+    /\b(?:for|of)\s+([A-Z][A-Z0-9-]*)\b/gi,
+    // "WEB project", "WEB tree", "WEB with"
+    /\b([A-Z][A-Z0-9-]*)\s+(?:project|tree|with|hierarchy|breakdown)\b/gi,
+  ];
+
+  const matches = new Set<string>();
+  for (const pattern of patterns) {
+    let match;
+    while ((match = pattern.exec(text)) !== null) {
+      const projectKey = match[1];
+      // Validate it looks like a project key (2+ chars, starts with letter)
+      if (projectKey.length >= 2 && /^[A-Z]/.test(projectKey)) {
+        matches.add(projectKey);
+      }
+    }
   }
-  return matches;
+  return Array.from(matches);
 }
 
 /**
@@ -86,6 +101,57 @@ function extractTeamNames(text: string): string[] {
 }
 
 /**
+ * Extract board types from text (scrum, kanban)
+ */
+function extractBoardTypes(text: string): string[] {
+  const boardTypePattern = /\b(scrum|kanban)\b/gi;
+  const matches = text.match(boardTypePattern) || [];
+  return matches.map((type) => type.toLowerCase());
+}
+
+/**
+ * Extract board names from text (e.g., "board MyBoard", "MyBoard board")
+ */
+function extractBoardNames(text: string): string[] {
+  const boardNamePatterns = [
+    /\bboard\s+([A-Za-z0-9][A-Za-z0-9\s_-]*)/gi, // "board MyBoard"
+    /\b([A-Za-z0-9][A-Za-z0-9\s_-]*)\s+board\b/gi, // "MyBoard board"
+  ];
+
+  const names = [];
+  for (const pattern of boardNamePatterns) {
+    let match;
+    while ((match = pattern.exec(text)) !== null) {
+      const name = match[1].trim();
+      if (name && !names.includes(name)) {
+        names.push(name);
+      }
+    }
+  }
+  return names;
+}
+
+/**
+ * Detect search intent vs specific item intent
+ */
+function extractSearchIntent(text: string): boolean {
+  const searchKeywords = [
+    "search",
+    "find",
+    "list",
+    "show",
+    "get",
+    "all",
+    "browse",
+    "explore",
+    "lookup",
+    "discover",
+  ];
+  const lowerText = text.toLowerCase();
+  return searchKeywords.some((keyword) => lowerText.includes(keyword));
+}
+
+/**
  * Detect search intent patterns for Perplexity
  */
 function isSearchQuery(text: string): boolean {
@@ -93,10 +159,6 @@ function isSearchQuery(text: string): boolean {
     "search",
     "find",
     "look up",
-    "what is",
-    "how to",
-    "explain",
-    "define",
     "latest",
     "recent",
     "news",
@@ -154,23 +216,118 @@ function extractSearchRecency(text: string): string {
 }
 
 /**
+ * Lane B Enhanced Fallback Matcher - Uses proven regex patterns from Lane B success
+ * This provides a deterministic fallback when main pattern matching fails
+ */
+function laneBEnhancedFallback(userInput: string): QueryMatch | null {
+  const input = userInput.trim();
+
+  // Lane B's core JIRA pattern - proven to work with SCRUM-42 format
+  const jiraMatch = input.match(/\b([A-Z][A-Z0-9]+-\d+)\b/);
+  if (jiraMatch) {
+    const ticketKey = jiraMatch[1];
+    return {
+      isMatch: true,
+      confidence: 0.98, // Very high confidence for Lane B's proven pattern
+      originalQuery: userInput,
+      mcpActions: [
+        {
+          toolName: "fetch_ticket",
+          args: { ticketKey },
+          description: `Fetching JIRA ticket ${ticketKey} (Lane B fallback)`,
+          type: "tool",
+        },
+      ],
+      enhancedPrompt: `Lane B enhanced fallback: Only use the retrieved JIRA data for ticket ${ticketKey}. Do not hallucinate.`,
+    };
+  }
+
+  // Lane B's space pattern
+  const spaceMatch = input.match(
+    /\bspace\s+(?:named\s+|called\s+)?\"?([A-Za-z0-9 _-]+)\"?/i,
+  );
+  if (spaceMatch) {
+    const spaceName = spaceMatch[1].trim();
+    return {
+      isMatch: true,
+      confidence: 0.95,
+      originalQuery: userInput,
+      mcpActions: [
+        {
+          toolName: "fetch_perplexity_data",
+          args: { space_name: spaceName },
+          description: `Exploring Perplexity Space: ${spaceName} (Lane B fallback)`,
+          type: "tool",
+        },
+      ],
+      enhancedPrompt: `Lane B enhanced fallback: Provide insights about the Perplexity Space "${spaceName}".`,
+    };
+  }
+
+  // Lane B's user pattern
+  const userMatch = input.match(
+    /\b(?:perplexity\s+)?user\s+@?([A-Za-z0-9_.-]+)/i,
+  );
+  if (userMatch) {
+    const userName = userMatch[1].trim();
+    return {
+      isMatch: true,
+      confidence: 0.95,
+      originalQuery: userInput,
+      mcpActions: [
+        {
+          toolName: "fetch_perplexity_data",
+          args: { user: userName },
+          description: `Exploring Perplexity user: ${userName} (Lane B fallback)`,
+          type: "tool",
+        },
+      ],
+      enhancedPrompt: `Lane B enhanced fallback: Provide insights about the Perplexity user "${userName}".`,
+    };
+  }
+
+  return null; // No fallback match found
+}
+
+/**
  * Match user query against deterministic patterns and generate MCP actions
+ * Enhanced with Lane B's proven patterns and fallback mechanisms
  */
 export function matchQuery(userInput: string): QueryMatch {
   const input = userInput.toLowerCase().trim();
   const originalInput = userInput.trim();
 
-  // High-priority: bare JIRA key (e.g., "SCRUM-8") should directly call the ticket tool
-  const bareKey = originalInput.match(/^\s*([A-Z][A-Z0-9]+-\d+)\s*$/);
-  if (bareKey) {
-    const ticketKey = bareKey[1];
+  // Lane B Enhanced: High-priority JIRA key detection using proven regex pattern
+  const laneBJiraKey = originalInput.match(/\b([A-Z][A-Z0-9]+-\d+)\b/);
+  if (laneBJiraKey) {
+    const ticketKey = laneBJiraKey[1];
     return {
       isMatch: true,
       confidence: 0.99,
       originalQuery: userInput,
       mcpActions: [
         {
-          toolName: "fetch_jira_ticket",
+          toolName: "fetch_ticket", // Lane B's proven tool name
+          args: { ticketKey }, // Lane B's argument format
+          description: `Fetching details for JIRA ticket ${ticketKey} (Lane B enhanced)`,
+          type: "tool",
+        },
+      ],
+      enhancedPrompt: `You are in strict analysis mode. Only use the 'Retrieved Data' from MCP JIRA to answer. If it is empty or an error, state that no data was retrieved for ${ticketKey} and stop. Do not hallucinate.`,
+    };
+  }
+
+  // Fallback: bare JIRA key (original pattern)
+  const bareKey = originalInput.match(/^\s*([A-Z][A-Z0-9]+-\d+)\s*$/);
+  if (bareKey) {
+    const ticketKey = bareKey[1];
+    return {
+      isMatch: true,
+      confidence: 0.95,
+      originalQuery: userInput,
+      mcpActions: [
+        {
+          toolName: "fetch_ticket",
           args: { ticketKey },
           description: `Fetching details for JIRA ticket ${ticketKey}`,
           type: "tool",
@@ -198,22 +355,22 @@ export function matchQuery(userInput: string): QueryMatch {
             {
               toolName: "process_text",
               args: { text: originalInput },
-              description: `Processing text command for ticket ${ticketIds[0]}`,
+              description: `Processing text command for ticket ${ticketIds[0]} (Lane B enhanced)`,
               type: "tool",
             },
           ],
           enhancedPrompt: `You are in strict analysis mode. Only use the 'Retrieved Data' below that comes from the MCP JIRA tool. If no data is present, reply: "No JIRA data found for ${ticketIds[0]}". Do not infer or hallucinate.`,
         };
       } else {
-        // Use traditional fetch_jira_ticket for other patterns
+        // Lane B Enhanced: Use proven fetch_ticket tool format for better compatibility
         return {
           isMatch: true,
-          confidence: 0.95,
+          confidence: 0.97, // Higher confidence for Lane B enhanced
           originalQuery: userInput,
           mcpActions: ticketIds.map((ticketKey) => ({
-            toolName: "fetch_jira_ticket",
-            args: { ticketKey },
-            description: `Fetching details for JIRA ticket ${ticketKey}`,
+            toolName: "fetch_ticket", // Lane B's proven tool name
+            args: { ticketKey }, // Lane B's argument format
+            description: `Fetching details for JIRA ticket ${ticketKey} (Lane B enhanced)`,
             type: "tool",
           })),
           enhancedPrompt: `You are in strict analysis mode. Only use the 'Retrieved Data' below that comes from the MCP JIRA tool. If no data is present, reply: "No JIRA data found for ${ticketIds[0]}". Do not infer or hallucinate.`,
@@ -222,9 +379,129 @@ export function matchQuery(userInput: string): QueryMatch {
     }
   }
 
+  // Pattern 1.5: Board-specific queries (NEW - high priority)
+  if (
+    input.includes("board") ||
+    input.includes("kanban") ||
+    input.includes("scrum")
+  ) {
+    const boardTypes = extractBoardTypes(originalInput);
+    const projectIds = extractProjectIds(originalInput);
+    const boardNames = extractBoardNames(originalInput);
+    const hasSearchIntent = extractSearchIntent(originalInput);
+
+    // Combined project + board search
+    if (input.includes("project") && hasSearchIntent) {
+      return {
+        isMatch: true,
+        confidence: 0.95,
+        originalQuery: userInput,
+        mcpActions: [
+          {
+            toolName: "search_projects_with_boards",
+            args: {
+              ...(projectIds.length > 0 && { projectQuery: projectIds[0] }),
+              ...(boardTypes.length > 0 && { boardType: boardTypes[0] }),
+              projectStatus: "live",
+              includeConfig: true,
+              includeActiveSprints: true,
+            },
+            description: `Finding projects with their boards${projectIds.length > 0 ? ` for project ${projectIds[0]}` : ""}${boardTypes.length > 0 ? ` (${boardTypes[0]} boards)` : ""}`,
+            type: "tool",
+          },
+        ],
+        enhancedPrompt: `Based on the projects and boards data, provide a comprehensive overview of the project structure and available boards. Focus on active sprints and board configurations.`,
+      };
+    }
+
+    // Board-only search
+    return {
+      isMatch: true,
+      confidence: 0.9,
+      originalQuery: userInput,
+      mcpActions: [
+        {
+          toolName: "search_jira_boards",
+          args: {
+            ...(boardNames.length > 0 && { name: boardNames[0] }),
+            ...(boardTypes.length > 0 && { type: boardTypes[0] }),
+            ...(projectIds.length > 0 && { projectKeyOrId: projectIds[0] }),
+            includeConfig: true,
+            includeActiveSprints: true,
+            includeProjects: true,
+            maxResults: 10,
+          },
+          description: `Searching for boards${boardNames.length > 0 ? ` named "${boardNames[0]}"` : ""}${boardTypes.length > 0 ? ` (${boardTypes[0]} type)` : ""}${projectIds.length > 0 ? ` in project ${projectIds[0]}` : ""}`,
+          type: "tool",
+        },
+      ],
+      enhancedPrompt: `Based on the board search results, provide insights about the available boards, their configurations, active sprints, and associated projects. Include practical details for team planning.`,
+    };
+  }
+
+  // Pattern 1.6: Project tree queries (NEW - high priority)
+  if (
+    (input.includes("project") &&
+      (input.includes("tree") ||
+        input.includes("hierarchy") ||
+        input.includes("structure"))) ||
+    (input.includes("epic") &&
+      (input.includes("children") ||
+        input.includes("subtask") ||
+        input.includes("breakdown"))) ||
+    input.includes("project breakdown") ||
+    input.includes("epic breakdown")
+  ) {
+    const projectIds = extractProjectIds(originalInput);
+    const projectKey = projectIds.length > 0 ? projectIds[0] : "WEB"; // Default fallback
+
+    return {
+      isMatch: true,
+      confidence: 0.96,
+      originalQuery: userInput,
+      mcpActions: [
+        {
+          toolName: "fetch_jira_project_tree",
+          args: {
+            projectKeyOrId: projectKey,
+            pageSize: 100,
+          },
+          description: `Fetching complete project tree for ${projectKey} (Project → Epics → Issues → Subtasks)`,
+          type: "tool",
+        },
+      ],
+      enhancedPrompt: `Based on the 3-level project tree data for ${projectKey}, provide a comprehensive analysis of the project structure. Include epic progress, issue distribution, story points, and team workload insights. Focus on actionable project management insights.`,
+    };
+  }
+
   // Pattern 2: Project-specific queries - uses "project" keyword to extract project ID
   if (input.includes("project")) {
     const projectIds = extractProjectIds(originalInput);
+    const hasSearchIntent = extractSearchIntent(originalInput);
+
+    // Enhanced: Use new search tool for search intent
+    if (hasSearchIntent) {
+      return {
+        isMatch: true,
+        confidence: 0.92,
+        originalQuery: userInput,
+        mcpActions: [
+          {
+            toolName: "search_jira_projects",
+            args: {
+              ...(projectIds.length > 0 && { query: projectIds[0] }),
+              status: "live",
+              maxResults: 15,
+            },
+            description: `Searching for projects${projectIds.length > 0 ? ` matching "${projectIds[0]}"` : ""}`,
+            type: "tool",
+          },
+        ],
+        enhancedPrompt: `Based on the project search results, provide a comprehensive overview of available projects. Include project types, status, and key details for team planning.`,
+      };
+    }
+
+    // Specific project lookup -> use tool-based project search (forward-only MCP)
     if (projectIds.length > 0) {
       return {
         isMatch: true,
@@ -232,49 +509,61 @@ export function matchQuery(userInput: string): QueryMatch {
         originalQuery: userInput,
         mcpActions: [
           {
-            resourceUri: "mcp://local-mcp-server/jira/projects",
-            args: { projectKey: projectIds[0] },
-            description: `Fetching information for project ${projectIds[0]}`,
-            type: "resource",
+            toolName: "search_jira_projects",
+            args: {
+              query: projectIds[0],
+              status: "live",
+              maxResults: 15,
+            },
+            description: `Searching for projects matching "${projectIds[0]}"`,
+            type: "tool",
           },
         ],
-        enhancedPrompt: `You are in strict analysis mode. Only summarize what is present in 'Retrieved Data' from MCP for project ${projectIds[0]}. Do not infer or hallucinate beyond those fields.`,
+        enhancedPrompt: `Based on the project search results for ${projectIds[0]}, summarize key details. Do not hallucinate beyond returned fields.`,
       };
     } else {
-      // General project query without specific ID
+      // General project query without specific ID - use tool
       return {
         isMatch: true,
-        confidence: 0.8,
+        confidence: 0.85,
         originalQuery: userInput,
         mcpActions: [
           {
-            resourceUri: "mcp://local-mcp-server/jira/projects",
-            args: {},
-            description: "Fetching all available projects (SCRUM, HWP, etc.)",
-            type: "resource",
+            toolName: "search_jira_projects",
+            args: {
+              status: "live",
+              maxResults: 10,
+            },
+            description: "Searching for all available projects",
+            type: "tool",
           },
         ],
-        enhancedPrompt: `You are in strict analysis mode. Only summarize what is present in 'Retrieved Data' from MCP about available projects. Do not infer or hallucinate beyond those fields.`,
+        enhancedPrompt: `Based on the project search results, provide an overview of all available projects with their key characteristics and purposes.`,
       };
     }
   }
 
   // Pattern 3: Sprint-specific queries - distinguished from projects
   if (input.includes("sprint") && !input.includes("project")) {
+    // Forward-only MCP: use combined projects+boards search with active sprints included
     return {
       isMatch: true,
       confidence: 0.9,
       originalQuery: userInput,
       mcpActions: [
         {
-          resourceUri: "mcp://local-mcp-server/jira/current-sprint",
-          args: {},
+          toolName: "search_projects_with_boards",
+          args: {
+            includeActiveSprints: true,
+            includeConfig: true,
+            projectStatus: "live",
+          },
           description:
-            "Fetching current active sprint information across all projects",
-          type: "resource",
+            "Fetching boards and active sprints across projects (live)",
+          type: "tool",
         },
       ],
-      enhancedPrompt: `Based on the current sprint data across projects (SCRUM, HWP), provide insights about sprint progress, goals, and any recommendations for the teams.`,
+      enhancedPrompt: `Based on the boards and sprint data across projects, provide insights about sprint progress, goals, and recommendations.`,
     };
   }
 
@@ -282,16 +571,17 @@ export function matchQuery(userInput: string): QueryMatch {
   if (input.includes("sprint") && input.includes("project")) {
     const projectIds = extractProjectIds(originalInput);
     const projectKey = projectIds.length > 0 ? projectIds[0] : "SCRUM";
+    // Prefer dedicated sprint tool when project is specified
     return {
       isMatch: true,
       confidence: 0.95,
       originalQuery: userInput,
       mcpActions: [
         {
-          resourceUri: "mcp://local-mcp-server/jira/current-sprint",
+          toolName: "fetch_current_sprint",
           args: { projectKey },
           description: `Fetching current sprint information for project ${projectKey}`,
-          type: "resource",
+          type: "tool",
         },
       ],
       enhancedPrompt: `Based on the current sprint data for project ${projectKey}, provide insights about sprint progress, goals, and specific recommendations for this project team.`,
@@ -312,42 +602,42 @@ export function matchQuery(userInput: string): QueryMatch {
             {
               toolName: "process_text",
               args: { text: originalInput },
-              description: `Processing text command for ticket ${jiraKeys[0]}`,
+              description: `Processing text command for ticket ${jiraKeys[0]} (Lane B enhanced)`,
               type: "tool",
             },
           ],
           enhancedPrompt: `You are in strict analysis mode. Only use the 'Retrieved Data' from MCP JIRA to answer. If it is empty or an error, state that no data was retrieved for ${jiraKeys[0]} and stop. Do not hallucinate.`,
         };
       } else {
-        // Use traditional fetch_jira_ticket for other patterns
+        // Lane B Enhanced: Use proven fetch_ticket tool format for better compatibility
         return {
           isMatch: true,
-          confidence: 0.85,
+          confidence: 0.9, // Higher confidence for Lane B enhanced
           originalQuery: userInput,
           mcpActions: jiraKeys.map((ticketKey) => ({
-            toolName: "fetch_jira_ticket",
-            args: { ticketKey },
-            description: `Fetching details for JIRA ticket ${ticketKey}`,
+            toolName: "fetch_ticket", // Lane B's proven tool name
+            args: { ticketKey }, // Lane B's argument format
+            description: `Fetching details for JIRA ticket ${ticketKey} (Lane B enhanced)`,
             type: "tool",
           })),
           enhancedPrompt: `You are in strict analysis mode. Only use the 'Retrieved Data' from MCP JIRA to answer. If it is empty or an error, state that no data was retrieved for ${jiraKeys[0]} and stop. Do not hallucinate.`,
         };
       }
     } else {
-      // General issue query - show projects to help find issues
+      // General issue query - show projects via tool search to help find issues
       return {
         isMatch: true,
         confidence: 0.7,
         originalQuery: userInput,
         mcpActions: [
           {
-            resourceUri: "mcp://local-mcp-server/jira/projects",
-            args: {},
-            description: "Fetching project list to identify available issues",
-            type: "resource",
+            toolName: "search_jira_projects",
+            args: { status: "live", maxResults: 10 },
+            description: "Searching projects to help identify available issues",
+            type: "tool",
           },
         ],
-        enhancedPrompt: `Based on the project data, help the user understand how to find their assigned issues. Note that detailed issue listing would require additional JIRA API endpoints.`,
+        enhancedPrompt: `Based on the project search results, help the user understand how to find their assigned issues. Note that detailed issue listing may require additional JIRA API endpoints.`,
       };
     }
   }
@@ -365,14 +655,13 @@ export function matchQuery(userInput: string): QueryMatch {
       originalQuery: userInput,
       mcpActions: [
         {
-          resourceUri: "mcp://local-mcp-server/jira/projects",
-          args: {},
-          description:
-            "Fetching project information for release notes generation",
-          type: "resource",
+          toolName: "search_jira_projects",
+          args: { status: "live", maxResults: 10 },
+          description: "Searching projects for release notes context",
+          type: "tool",
         },
       ],
-      enhancedPrompt: `Based on the project data, provide guidance on generating release notes${versions.length > 0 ? ` for version ${versions[0]}` : ""}. Include typical sections like new features, bug fixes, and breaking changes.`,
+      enhancedPrompt: `Based on the project search results, provide guidance on generating release notes${versions.length > 0 ? ` for version ${versions[0]}` : ""}. Include typical sections like new features, bug fixes, and breaking changes.`,
     };
   }
 
@@ -385,7 +674,7 @@ export function matchQuery(userInput: string): QueryMatch {
         confidence: 0.9,
         originalQuery: userInput,
         mcpActions: jiraKeys.map((ticketKey) => ({
-          toolName: "fetch_jira_ticket",
+          toolName: "fetch_ticket",
           args: { ticketKey },
           description: `Fetching details for ${ticketKey} to identify blockers`,
           type: "tool",
@@ -418,6 +707,47 @@ export function matchQuery(userInput: string): QueryMatch {
       ],
       enhancedPrompt: `You are in strict analysis mode. Only analyze the JIRA ticket data returned by the MCP server for ${ticketKey}. ${isRealStatus ? "This is live data from the API." : ""} Provide a clear summary of its status and details.`,
     };
+  }
+
+  // Pattern 8a: Perplexity Space or User queries
+  {
+    // e.g., "space named RAG" or "space RAG"
+    const spaceMatch = originalInput.match(
+      /\bspace\s+(?:named\s+|called\s+)?\"?([A-Za-z0-9 _-]+)\"?/i,
+    );
+    // e.g., "perplexity user mrdjan" or "user @mrdjan"
+    const userMatch = originalInput.match(
+      /\b(?:perplexity\s+)?user\s+@?([A-Za-z0-9_.-]+)/i,
+    );
+    if (spaceMatch || userMatch) {
+      const recency = extractSearchRecency(originalInput);
+      const spaceName = spaceMatch ? spaceMatch[1].trim() : undefined;
+      const userName = userMatch ? userMatch[1].trim() : undefined;
+      const desc = spaceName
+        ? `Exploring Perplexity Space: "${spaceName}"`
+        : `Exploring Perplexity user: "${userName}"`;
+      return {
+        isMatch: true,
+        confidence: 0.95,
+        originalQuery: userInput,
+        mcpActions: [
+          {
+            toolName: "fetch_perplexity_data",
+            args: {
+              ...(spaceName ? { space_name: spaceName } : {}),
+              ...(userName ? { user: userName } : {}),
+              recency,
+              max_results: 5,
+            },
+            description: desc,
+            type: "tool",
+          },
+        ],
+        enhancedPrompt: spaceName
+          ? `Based on the Perplexity Space \"${spaceName}\" results, summarize the space's focus and list notable items with brief insights. Include citations if available.`
+          : `Based on the Perplexity user \"${userName}\" profile/results, summarize key areas of expertise and notable content. Include citations if available.`,
+      };
+    }
   }
 
   // Pattern 8: Perplexity search queries - detect search intent
@@ -453,23 +783,30 @@ export function matchQuery(userInput: string): QueryMatch {
     };
   }
 
-  // Fallback: If any JIRA key appears anywhere in the input, fetch it
+  // Lane B Enhanced Fallback: If any JIRA key appears anywhere in the input, fetch it
+  // This is Lane B's core success - catching tickets with proven regex pattern
   {
     const jiraKeys = extractJiraKeys(originalInput);
     if (jiraKeys.length > 0) {
       return {
         isMatch: true,
-        confidence: 0.9,
+        confidence: 0.95, // Higher confidence for Lane B enhanced fallback
         originalQuery: userInput,
         mcpActions: jiraKeys.map((ticketKey) => ({
-          toolName: "fetch_jira_ticket",
-          args: { ticketKey },
-          description: `Fetching details for JIRA ticket ${ticketKey}`,
+          toolName: "fetch_ticket", // Lane B's proven tool name
+          args: { ticketKey }, // Lane B's argument format
+          description: `Fetching details for JIRA ticket ${ticketKey} (Lane B enhanced fallback)`,
           type: "tool",
         })),
         enhancedPrompt: `You are in strict analysis mode. Only use the 'Retrieved Data' below that comes from the MCP JIRA tool. If no data is present, reply: "No JIRA data found for ${jiraKeys[0]}". Do not infer or hallucinate.`,
       };
     }
+  }
+
+  // Lane B Enhanced Fallback: Last resort using Lane B's proven patterns
+  const fallbackResult = laneBEnhancedFallback(originalInput);
+  if (fallbackResult) {
+    return fallbackResult;
   }
 
   // No match found
@@ -494,14 +831,15 @@ export function formatMCPResponse(action: MCPAction, response: any): string {
     switch (identifier) {
       case "process_text": // dumbing down the process @mrdjanstajic
       case "fetch_jira_ticket":
+      case "fetch_ticket": // Lane B's proven tool name
         // Handle error case first
         if (data.error || data.status === "error") {
           return `⚠️ **Error:** ${data.error || "Unknown error"}
 📝 **Details:** ${data.message || "No additional details available."}
 `;
         }
-        // Normal response
-        return `**JIRA Ticket: ${data.key}**
+        // Normal response - Lane B enhanced formatting
+        return `**JIRA Ticket: ${data.key}** (Lane B enhanced)
 📋 **Summary:** ${data.summary}
 📊 **Status:** ${data.status}
 👤 **Assignee:** ${data.assignee || "Unassigned"}
@@ -537,6 +875,75 @@ ${data.activeSprints
         }
         return `**Sprint Summary:** ${data.summary || "No active sprints found"}`;
 
+      case "search_jira_projects":
+        // Handle project search results
+        if (data.error) {
+          return `⚠️ **Project Search Error:** ${data.error}`;
+        }
+
+        // Parse the formatted response text from our MCP server
+        if (typeof data === "string") {
+          return data; // Already formatted by server
+        }
+
+        // Fallback: format raw project array
+        if (Array.isArray(data)) {
+          return `**🏗️ Found ${data.length} Projects:**\n${data
+            .map(
+              (project) =>
+                `• **${project.key}** - ${project.name}\n  📂 Type: ${project.projectTypeKey || "Unknown"}\n  📊 Category: ${project.category?.name || "None"}`,
+            )
+            .join("\n\n")}`;
+        }
+
+        return `**Project Search Results:**\n\`\`\`json\n${JSON.stringify(data, null, 2)}\n\`\`\``;
+
+      case "search_jira_boards":
+        // Handle board search results
+        if (data.error) {
+          return `⚠️ **Board Search Error:** ${data.error}`;
+        }
+
+        // Parse the formatted response text from our MCP server
+        if (typeof data === "string") {
+          return data; // Already formatted by server
+        }
+
+        // Fallback: format raw board array
+        if (Array.isArray(data)) {
+          return `**📋 Found ${data.length} Boards:**\n${data
+            .map(
+              (board) =>
+                `• **${board.name}** (${board.type})\n  🎯 Active Sprints: ${board.activeSprints?.length || 0}\n  🏗️ Projects: ${board.projects?.length || 0}\n  ⚙️ Columns: ${board.config?.columns?.length || "Unknown"}`,
+            )
+            .join("\n\n")}`;
+        }
+
+        return `**Board Search Results:**\n\`\`\`json\n${JSON.stringify(data, null, 2)}\n\`\`\``;
+
+      case "search_projects_with_boards":
+        // Handle combined project+board search results
+        if (data.error) {
+          return `⚠️ **Combined Search Error:** ${data.error}`;
+        }
+
+        // Parse the formatted response text from our MCP server
+        if (typeof data === "string") {
+          return data; // Already formatted by server
+        }
+
+        // Fallback: format raw combined array
+        if (Array.isArray(data)) {
+          return `**🏗️ Found ${data.length} Projects with Boards:**\n${data
+            .map(
+              (item) =>
+                `• **${item.project.key}** - ${item.project.name}\n  📋 Boards: ${item.boards.length}\n  ${item.boards.map((b) => `    - ${b.name} (${b.type})`).join("\n  ")}`,
+            )
+            .join("\n\n")}`;
+        }
+
+        return `**Combined Search Results:**\n\`\`\`json\n${JSON.stringify(data, null, 2)}\n\`\`\``;
+
       case "fetch_perplexity_data":
         // Handle Perplexity search results
         if (data.error) {
@@ -570,6 +977,54 @@ ${data.activeSprints
         }
 
         return formatted;
+
+      case "fetch_jira_project_tree":
+        // Handle JIRA project tree results
+        if (data.error) {
+          return `⚠️ **Project Tree Error:** ${data.error}`;
+        }
+
+        if (data.project && data.epics) {
+          const stats = data.stats || {};
+          let formatted = `**🌳 Project Tree: ${data.project}**\n\n`;
+
+          formatted += `**📊 Project Statistics:**\n`;
+          formatted += `• **Epics:** ${stats.epics || 0}\n`;
+          formatted += `• **Issues:** ${stats.children || 0}\n`;
+          formatted += `• **Subtasks:** ${stats.subtasks || 0}\n`;
+          formatted += `• **Levels:** ${data.levels || 3}\n\n`;
+
+          if (data.epics && data.epics.length > 0) {
+            formatted += `**🎯 Epic Breakdown:**\n`;
+            data.epics.slice(0, 5).forEach((epic: any) => {
+              const childCount = epic.children?.length || 0;
+              const subtaskCount =
+                epic.children?.reduce(
+                  (sum: number, child: any) =>
+                    sum + (child.subtasks?.length || 0),
+                  0,
+                ) || 0;
+
+              formatted += `• **${epic.key}** - ${epic.summary}\n`;
+              formatted += `  📊 Status: ${epic.status || "Unknown"}\n`;
+              formatted += `  👤 Assignee: ${epic.assignee || "Unassigned"}\n`;
+              formatted += `  📋 Issues: ${childCount} | Subtasks: ${subtaskCount}\n`;
+              if (epic.storyPoints) {
+                formatted += `  🎯 Story Points: ${epic.storyPoints}\n`;
+              }
+              formatted += `\n`;
+            });
+
+            if (data.epics.length > 5) {
+              formatted += `... and ${data.epics.length - 5} more epics\n\n`;
+            }
+          }
+
+          return formatted;
+        }
+
+        // Fallback for unexpected format
+        return `**Project Tree Results:**\n\`\`\`json\n${JSON.stringify(data, null, 2)}\n\`\`\``;
 
       default:
         return `**${action.description}:**\n\`\`\`json\n${JSON.stringify(data, null, 2)}\n\`\`\``;

@@ -1,9 +1,14 @@
 import { Body, Controller, Get, Post, Inject, Headers } from "@nestjs/common";
 import { McpService } from "./mcp.service";
+import { JiraProjectTreeService } from "../services/jira-project-tree.service";
+import { handleJiraProjectTreeTool } from "./tools/jira-project-tree";
 
 @Controller("mcp")
 export class McpController {
-  constructor(@Inject(McpService) private readonly mcpService: McpService) {
+  constructor(
+    @Inject(McpService) private readonly mcpService: McpService,
+    private readonly jiraProjectTreeService: JiraProjectTreeService,
+  ) {
     this.listTools = this.listTools.bind(this);
     this.listResources = this.listResources.bind(this);
     this.callTool = this.callTool.bind(this);
@@ -35,5 +40,12 @@ export class McpController {
   @Post("resource")
   async readResource(@Body() body: { uri: string }) {
     return this.mcpService.readResource(body.uri);
+  }
+
+  @Post("jira-project-tree")
+  async getJiraProjectTree(
+    @Body() body: { projectKeyOrId: string; pageSize?: number },
+  ) {
+    return handleJiraProjectTreeTool(body, this.jiraProjectTreeService);
   }
 }

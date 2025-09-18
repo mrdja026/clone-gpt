@@ -93,19 +93,18 @@ export class McpService {
     name: string,
     args: Record<string, any>,
     perplexityKey?: string,
+    extraHeaders?: Record<string, string>,
   ) {
-    const headers: Record<string, string> = {};
+    // Merge caller-provided headers (e.g., correlation IDs) with optional Perplexity key
+    const headers: Record<string, string> = {
+      ...(extraHeaders || {}),
+    };
 
-    // Add Perplexity API key header if provided and tool is fetch_perplexity_data
     if (perplexityKey && name === "fetch_perplexity_data") {
       headers["X-Perplexity-Key"] = perplexityKey;
     }
 
-    return this.callRpc(
-      "callTool",
-      { name, arguments: args },
-      Object.keys(headers).length > 0 ? headers : undefined,
-    );
+    return this.callRpc("callTool", { name, arguments: args }, headers);
   }
 
   async readResource(uri: string) {

@@ -8,8 +8,6 @@ import { matchQuery, formatMCPResponse } from "@/lib/query-matcher";
 import { mcpClient } from "@/lib/mcp-client";
 import { cn } from "@/lib/utils";
 import { useNavigate, Link } from "react-router-dom";
-// icons used via ThemeToggle
-import AboutContent from "@/components/AboutContent";
 import AppHeader from "@/components/AppHeader";
 import ProvidersMenu from "@/components/ProvidersMenu";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -401,20 +399,6 @@ export default function PostLogin() {
                       </Button>
                     </div>
                   </div>
-                </div>
-              </div>
-            </section>
-
-            <section>
-              <div className="mx-auto max-w-5xl">
-                <div className="mb-4 flex items-center justify-between">
-                  <h2 className="text-lg font-semibold">About</h2>
-                  <Button variant="link" asChild>
-                    <Link to="/about">View full page</Link>
-                  </Button>
-                </div>
-                <div>
-                  <AboutContent compact />
                 </div>
               </div>
             </section>
