@@ -101,3 +101,11 @@ export const jiraQuickActions: QuickActionGroup[] = [
     ],
   },
 ];
+
+/**
+ * Flattened deterministic prompts derived from jiraQuickActions.
+ * Use in dropdowns like DeterministicSearchBar suggestions.
+ */
+export const jiraDeterministicPrompts: string[] = jiraQuickActions.flatMap(
+  (g) => g.items.map((i) => i.prompt),
+);

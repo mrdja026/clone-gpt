@@ -10,9 +10,8 @@ import ChatPanel from "./components/ChatPanel";
 import ProvidersPanel from "./components/ProvidersPanel";
 import AboutPreview from "./components/AboutPreview";
 import ReasoningMode from "./components/ReasoningMode";
-import { TemplatesGrid } from "@/components/home/TemplatesGrid";
 import { DeterministicSearchBar } from "@/components/home/DeterministicSearchBar";
-import { deterministicQueries } from "@/lib/queries";
+import { jiraDeterministicPrompts } from "@/content/jira-placeholders";
 import { Brain } from "lucide-react";
 
 const providers = [
@@ -47,8 +46,9 @@ export default function PostLoginPage() {
     isReasoningAvailable,
   } = usePostLogin();
 
-  const handleApplyQuery = (query: string) => {
+  const handleApplyQuery = async (query: string) => {
     setPendingPrompt(query);
+    await onSend(query);
   };
 
   const handleTemplateSelect = (template: string) => {
@@ -88,6 +88,8 @@ export default function PostLoginPage() {
               value={searchQuery}
               onChange={setSearchQuery}
               placeholder="Type to search deterministic queries..."
+              suggestions={jiraDeterministicPrompts}
+              autoExecuteOnSelect
             />
 
             <ChatPanel
@@ -100,14 +102,6 @@ export default function PostLoginPage() {
               onSwitchConversation={onSwitchConversation}
               onCloseConversation={onCloseConversation}
             />
-
-            {/* Templates Grid */}
-            <div className="mt-8">
-              <TemplatesGrid
-                queries={deterministicQueries}
-                onSelect={handleTemplateSelect}
-              />
-            </div>
 
             {/* Reasoning Mode Button */}
             {isReasoningAvailable && (

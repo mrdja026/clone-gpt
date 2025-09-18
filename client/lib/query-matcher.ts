@@ -501,7 +501,7 @@ export function matchQuery(userInput: string): QueryMatch {
       };
     }
 
-    // Legacy: Specific project lookup (keep for backward compatibility)
+    // Specific project lookup -> use tool-based project search (forward-only MCP)
     if (projectIds.length > 0) {
       return {
         isMatch: true,
@@ -509,16 +509,20 @@ export function matchQuery(userInput: string): QueryMatch {
         originalQuery: userInput,
         mcpActions: [
           {
-            resourceUri: "mcp://local-mcp-server/jira/projects",
-            args: { projectKey: projectIds[0] },
-            description: `Fetching information for project ${projectIds[0]}`,
-            type: "resource",
+            toolName: "search_jira_projects",
+            args: {
+              query: projectIds[0],
+              status: "live",
+              maxResults: 15,
+            },
+            description: `Searching for projects matching "${projectIds[0]}"`,
+            type: "tool",
           },
         ],
-        enhancedPrompt: `You are in strict analysis mode. Only summarize what is present in 'Retrieved Data' from MCP for project ${projectIds[0]}. Do not infer or hallucinate beyond those fields.`,
+        enhancedPrompt: `Based on the project search results for ${projectIds[0]}, summarize key details. Do not hallucinate beyond returned fields.`,
       };
     } else {
-      // General project query without specific ID - use new search tool
+      // General project query without specific ID - use tool
       return {
         isMatch: true,
         confidence: 0.85,
@@ -541,20 +545,25 @@ export function matchQuery(userInput: string): QueryMatch {
 
   // Pattern 3: Sprint-specific queries - distinguished from projects
   if (input.includes("sprint") && !input.includes("project")) {
+    // Forward-only MCP: use combined projects+boards search with active sprints included
     return {
       isMatch: true,
       confidence: 0.9,
       originalQuery: userInput,
       mcpActions: [
         {
-          resourceUri: "mcp://local-mcp-server/jira/current-sprint",
-          args: {},
+          toolName: "search_projects_with_boards",
+          args: {
+            includeActiveSprints: true,
+            includeConfig: true,
+            projectStatus: "live",
+          },
           description:
-            "Fetching current active sprint information across all projects",
-          type: "resource",
+            "Fetching boards and active sprints across projects (live)",
+          type: "tool",
         },
       ],
-      enhancedPrompt: `Based on the current sprint data across projects (SCRUM, HWP), provide insights about sprint progress, goals, and any recommendations for the teams.`,
+      enhancedPrompt: `Based on the boards and sprint data across projects, provide insights about sprint progress, goals, and recommendations.`,
     };
   }
 
@@ -562,16 +571,17 @@ export function matchQuery(userInput: string): QueryMatch {
   if (input.includes("sprint") && input.includes("project")) {
     const projectIds = extractProjectIds(originalInput);
     const projectKey = projectIds.length > 0 ? projectIds[0] : "SCRUM";
+    // Prefer dedicated sprint tool when project is specified
     return {
       isMatch: true,
       confidence: 0.95,
       originalQuery: userInput,
       mcpActions: [
         {
-          resourceUri: "mcp://local-mcp-server/jira/current-sprint",
+          toolName: "fetch_current_sprint",
           args: { projectKey },
           description: `Fetching current sprint information for project ${projectKey}`,
-          type: "resource",
+          type: "tool",
         },
       ],
       enhancedPrompt: `Based on the current sprint data for project ${projectKey}, provide insights about sprint progress, goals, and specific recommendations for this project team.`,
@@ -614,20 +624,20 @@ export function matchQuery(userInput: string): QueryMatch {
         };
       }
     } else {
-      // General issue query - show projects to help find issues
+      // General issue query - show projects via tool search to help find issues
       return {
         isMatch: true,
         confidence: 0.7,
         originalQuery: userInput,
         mcpActions: [
           {
-            resourceUri: "mcp://local-mcp-server/jira/projects",
-            args: {},
-            description: "Fetching project list to identify available issues",
-            type: "resource",
+            toolName: "search_jira_projects",
+            args: { status: "live", maxResults: 10 },
+            description: "Searching projects to help identify available issues",
+            type: "tool",
           },
         ],
-        enhancedPrompt: `Based on the project data, help the user understand how to find their assigned issues. Note that detailed issue listing would require additional JIRA API endpoints.`,
+        enhancedPrompt: `Based on the project search results, help the user understand how to find their assigned issues. Note that detailed issue listing may require additional JIRA API endpoints.`,
       };
     }
   }
@@ -645,14 +655,13 @@ export function matchQuery(userInput: string): QueryMatch {
       originalQuery: userInput,
       mcpActions: [
         {
-          resourceUri: "mcp://local-mcp-server/jira/projects",
-          args: {},
-          description:
-            "Fetching project information for release notes generation",
-          type: "resource",
+          toolName: "search_jira_projects",
+          args: { status: "live", maxResults: 10 },
+          description: "Searching projects for release notes context",
+          type: "tool",
         },
       ],
-      enhancedPrompt: `Based on the project data, provide guidance on generating release notes${versions.length > 0 ? ` for version ${versions[0]}` : ""}. Include typical sections like new features, bug fixes, and breaking changes.`,
+      enhancedPrompt: `Based on the project search results, provide guidance on generating release notes${versions.length > 0 ? ` for version ${versions[0]}` : ""}. Include typical sections like new features, bug fixes, and breaking changes.`,
     };
   }
 
