@@ -15,6 +15,42 @@ import ProviderNotion from "./pages/ProviderNotion";
 import Diagnostics from "./pages/Diagnostics";
 import LaneBTest from "./pages/LaneBTest";
 
+/**
+ * DEV: Test prompts to validate tickets, boards, projects, sprints, and updates (SCRUM, HWP/HWB)
+ * Navigate to /chat and paste any of these into the chat input.
+ */
+export const DEV_TEST_PROMPTS = [
+  // Tickets and tasks (SCRUM-prefixed)
+  "SCRUM-8",
+  "Status-SCRUM-8",
+  "RealStatus-SCRUM-8",
+  "blockers for SCRUM-25",
+
+  // Boards (SCRUM and HWP/HWB)
+  "list scrum boards for project SCRUM",
+  "list boards for project HWP",
+  "list boards for project HWB",
+  "search scrum boards with active sprints",
+
+  // Projects (SCRUM, HWP)
+  "search project SCRUM",
+  "search project HWP",
+  "list projects",
+  "search projects with boards",
+
+  // Project tree (3 levels)
+  "Show me the complete 3-level project tree for SCRUM",
+  "Show me the complete 3-level project tree for HWP",
+
+  // Sprints (active sprint info)
+  "project SCRUM sprint",
+  "which sprint is active right now in my scrum project?",
+
+  // Updates and release notes
+  "generate release notes for version 1.0.0",
+  "what can we put in release notes for the last update of SCRUM?",
+];
+
 const queryClient = new QueryClient();
 
 const App = () => (
