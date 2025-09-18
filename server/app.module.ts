@@ -1,6 +1,5 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
-import { ChatModule } from "./chat/chat.module";
 import { SupabaseModule } from "./supabase/supabase.module";
 import { ServicesModule } from "./services/services.module";
 import { DemoController } from "./controllers/demo.controller";
@@ -25,7 +24,6 @@ import { ReasoningModule } from "./services/reasoning/reasoning.module";
     LaneBModule,
     LaneCModule,
     ReasoningModule,
-    ChatModule,
   ],
   controllers: [
     DemoController,

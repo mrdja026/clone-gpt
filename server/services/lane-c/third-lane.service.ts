@@ -6,7 +6,7 @@ import { ThirdLaneRequest, ThirdLaneResponse, ChatMessage } from "@shared/api";
 export class ThirdLaneService {
   private readonly logger = new Logger(ThirdLaneService.name);
 
-  constructor(private orchestrator: ThirdLaneOrchestrator) {
+  constructor(private readonly orchestrator: ThirdLaneOrchestrator) {
     this.logger.log("ThirdLaneService initialized");
   }
 
@@ -16,8 +16,16 @@ export class ThirdLaneService {
   async processQuery(request: ThirdLaneRequest): Promise<ThirdLaneResponse> {
     this.logger.log(`Processing Third Lane query: ${request.userQuery}`);
 
+    const orchestrator = this.orchestrator;
+    if (!orchestrator || typeof orchestrator.processQuery !== "function") {
+      this.logger.error(
+        "ThirdLaneOrchestrator is not available or improperly injected",
+      );
+      throw new Error("Third Lane orchestrator unavailable");
+    }
+
     try {
-      const response = await this.orchestrator.processQuery(request);
+      const response = await orchestrator.processQuery(request);
       this.logger.log(
         `Third Lane processing completed. Mode: ${response.mode}`,
       );

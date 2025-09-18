@@ -11,7 +11,16 @@ import { McpModule } from "../../mcp/mcp.module";
 @Module({
   imports: [forwardRef(() => LaneBModule), ReasoningModule, McpModule],
   controllers: [ThirdLaneController],
-  providers: [LaneCService, ThirdLaneOrchestrator, ThirdLaneService],
-  exports: [LaneCService, ThirdLaneOrchestrator, ThirdLaneService],
+  providers: [
+    LaneCService,
+    ThirdLaneOrchestrator,
+    {
+      provide: ThirdLaneService,
+      useFactory: (orchestrator: ThirdLaneOrchestrator) =>
+        new ThirdLaneService(orchestrator),
+      inject: [ThirdLaneOrchestrator],
+    },
+  ],
+  exports: [ThirdLaneService],
 })
 export class LaneCModule {}
