@@ -1,4 +1,4 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, Inject } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import {
   LaneBResult,
@@ -10,7 +10,9 @@ import {
 export class LaneBService {
   private readonly logger = new Logger(LaneBService.name);
 
-  constructor(private configService: ConfigService) {
+  constructor(
+    @Inject(ConfigService) private readonly configService: ConfigService,
+  ) {
     this.logger.log(
       "LaneBService constructor called - service is being instantiated",
     );

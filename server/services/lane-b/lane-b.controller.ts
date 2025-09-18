@@ -5,6 +5,7 @@ import {
   HttpCode,
   HttpStatus,
   Logger,
+  Inject,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { LaneBService } from "./lane-b.service";
@@ -16,8 +17,8 @@ export class LaneBController {
   private readonly logger = new Logger(LaneBController.name);
 
   constructor(
-    private readonly laneBService: LaneBService,
-    private readonly configService: ConfigService,
+    @Inject(LaneBService) private readonly laneBService: LaneBService,
+    @Inject(ConfigService) private readonly configService: ConfigService,
   ) {
     this.logger.log("LaneBController constructor called");
     this.logger.log("laneBService is defined:", !!this.laneBService);
