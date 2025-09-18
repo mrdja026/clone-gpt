@@ -53,7 +53,8 @@ export const SUPPORTED_TOOLS: ToolDefinition[] = [
 ];
 
 export const QUERY_PATTERNS = {
-  JIRA_KEY: /\b[A-Z][A-Z0-9]+-\d+\b/,
+  // Capture group for robust extraction and allow case-insensitive detection
+  JIRA_KEY: /\b([A-Z][A-Z0-9]+-\d+)\b/i,
   SPACE: /\bspace\s+([A-Za-z0-9_-]+)\b/i,
   USER: /\buser\s+@?([A-Za-z0-9_.-]+)\b/i,
 } as const;

@@ -88,12 +88,9 @@ ${JSON.stringify(SUPPORTED_TOOLS, null, 2)}
   }
 
   private async callOllama(prompt: string): Promise<string> {
-    const laneAHost = this.configService.get<string>(
-      "LANE_A_HOST",
-      "127.0.0.1:123",
-    );
+    const laneAHost = "127.0.0.1:124/v1";
     const ollamaUrl = this.configService.get<string>(
-      "OLLAMA_URL",
+      "OPENAI_BASE_URL",
       `http://${laneAHost}/api/generate`,
     );
     const model = this.configService.get<string>(
@@ -110,7 +107,7 @@ ${JSON.stringify(SUPPORTED_TOOLS, null, 2)}
         body: JSON.stringify({
           model,
           prompt,
-          stream: false,
+          stream: true,
         }),
       });
 
@@ -161,7 +158,9 @@ ${JSON.stringify(SUPPORTED_TOOLS, null, 2)}
           return matcherResult;
         } else {
           this.logger.log("No tool calls found, treating as chat response");
+          throw new Error("No tool calls found, treating as chat response");
           return {
+            //TODO potential missmatch when to go into discussion mode
             tool_calls: [],
             source: "chat",
             chat: rawResponse,

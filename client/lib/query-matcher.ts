@@ -327,7 +327,7 @@ export function matchQuery(userInput: string): QueryMatch {
       originalQuery: userInput,
       mcpActions: [
         {
-          toolName: "fetch_jira_ticket",
+          toolName: "fetch_ticket",
           args: { ticketKey },
           description: `Fetching details for JIRA ticket ${ticketKey}`,
           type: "tool",
@@ -674,7 +674,7 @@ export function matchQuery(userInput: string): QueryMatch {
         confidence: 0.9,
         originalQuery: userInput,
         mcpActions: jiraKeys.map((ticketKey) => ({
-          toolName: "fetch_jira_ticket",
+          toolName: "fetch_ticket",
           args: { ticketKey },
           description: `Fetching details for ${ticketKey} to identify blockers`,
           type: "tool",
