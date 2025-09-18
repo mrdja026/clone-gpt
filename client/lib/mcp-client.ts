@@ -19,18 +19,8 @@ export class MCPClient {
   private serverProcess: any = null;
   private isInitialized = false;
 
-  // Optional auth headers (e.g., Perplexity key passed through to server)
+  // No auth headers are passed in fixtures/adapter mode
   private getAuthHeaders(): Record<string, string> {
-    try {
-      if (typeof window !== "undefined" && window.localStorage) {
-        const pxKey = localStorage.getItem("PERPLEXITY_API_KEY");
-        if (pxKey && pxKey.trim().length > 0) {
-          return { "X-Perplexity-Key": pxKey.trim() };
-        }
-      }
-    } catch {
-      // Ignore storage access errors and return empty headers
-    }
     return {};
   }
 

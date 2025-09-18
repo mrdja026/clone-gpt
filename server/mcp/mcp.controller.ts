@@ -1,14 +1,9 @@
 import { Body, Controller, Get, Post, Inject, Headers } from "@nestjs/common";
 import { McpService } from "./mcp.service";
-import { JiraProjectTreeService } from "../services/jira-project-tree.service";
-import { handleJiraProjectTreeTool } from "./tools/jira-project-tree";
 
 @Controller("mcp")
 export class McpController {
-  constructor(
-    @Inject(McpService) private readonly mcpService: McpService,
-    private readonly jiraProjectTreeService: JiraProjectTreeService,
-  ) {
+  constructor(@Inject(McpService) private readonly mcpService: McpService) {
     this.listTools = this.listTools.bind(this);
     this.listResources = this.listResources.bind(this);
     this.callTool = this.callTool.bind(this);
@@ -30,11 +25,7 @@ export class McpController {
     @Body() body: { name: string; arguments: Record<string, any> },
     @Headers() headers: Record<string, string>,
   ) {
-    // Extract Perplexity API key from headers or environment
-    const perplexityKey =
-      headers["x-perplexity-key"] || process.env.PERPLEXITY_API_KEY;
-
-    return this.mcpService.callTool(body.name, body.arguments, perplexityKey);
+    return this.mcpService.callTool(body.name, body.arguments, headers);
   }
 
   @Post("resource")
@@ -42,10 +33,4 @@ export class McpController {
     return this.mcpService.readResource(body.uri);
   }
 
-  @Post("jira-project-tree")
-  async getJiraProjectTree(
-    @Body() body: { projectKeyOrId: string; pageSize?: number },
-  ) {
-    return handleJiraProjectTreeTool(body, this.jiraProjectTreeService);
-  }
 }

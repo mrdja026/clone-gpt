@@ -1,6 +1,13 @@
 import { Injectable, Inject } from "@nestjs/common";
 import axios from "axios";
 import { ConfigService } from "@nestjs/config";
+import {
+  fixturesListTools,
+  fixturesListResources,
+  fixturesCallTool,
+  fixturesReadResource,
+  fixturesEnabledByDefault,
+} from "../fixtures/mcp/fixtures";
 
 @Injectable()
 export class McpService {
@@ -18,8 +25,16 @@ export class McpService {
     const forwardOnly =
       this.configService.get<string>("MCP_FORWARD_ONLY") ||
       process.env.MCP_FORWARD_ONLY ||
-      "1"; // Default to forward-only
-    return forwardOnly !== "0" && forwardOnly !== "false";
+      "0"; // Default to fixtures/adapter mode
+    return !(forwardOnly === "0" || forwardOnly.toLowerCase?.() === "false");
+  }
+
+  private isFixturesMode() {
+    const fixtures =
+      this.configService.get<string>("MCP_USE_FIXTURES") ||
+      process.env.MCP_USE_FIXTURES ||
+      (fixturesEnabledByDefault ? "1" : "0");
+    return !(fixtures === "0" || fixtures.toLowerCase?.() === "false");
   }
 
   private async callRpc<T = any>(
@@ -29,6 +44,7 @@ export class McpService {
   ): Promise<T> {
     const base = this.getMcpBaseUrl();
     const forwardOnly = this.isForwardOnlyMode();
+    const fixtures = this.isFixturesMode();
 
     // Forward-only mode: require external MCP
     if (forwardOnly) {
@@ -74,10 +90,30 @@ export class McpService {
       }
     }
 
-    // Legacy mode is disabled in forward-only architecture
+    // Fixtures/Adapter mode (default): dispatch locally
+    if (fixtures) {
+      // Emulate JSON-RPC dispatch using fixtures adapter
+      switch (method) {
+        case "listTools":
+        case "tools/list":
+          return fixturesListTools() as any;
+        case "listResources":
+        case "resources/list":
+          return fixturesListResources() as any;
+        case "callTool":
+        case "tools/call":
+          return fixturesCallTool(params?.name, params?.arguments, headers) as any;
+        case "readResource":
+        case "resources/read":
+          return fixturesReadResource(params?.uri) as any;
+        default:
+          throw new Error(`Unknown MCP method in fixtures mode: ${method}`);
+      }
+    }
+
+    // Fallback
     throw new Error(
-      "MCP legacy mode is not supported in forward-only architecture. " +
-        "Set MCP_BASE_URL to point to an external MCP server.",
+      "No MCP mode available. Enable fixtures with MCP_USE_FIXTURES=1 (default) or configure forward-only with MCP_FORWARD_ONLY=1 and MCP_BASE_URL.",
     );
   }
 
@@ -92,18 +128,9 @@ export class McpService {
   async callTool(
     name: string,
     args: Record<string, any>,
-    perplexityKey?: string,
     extraHeaders?: Record<string, string>,
   ) {
-    // Merge caller-provided headers (e.g., correlation IDs) with optional Perplexity key
-    const headers: Record<string, string> = {
-      ...(extraHeaders || {}),
-    };
-
-    if (perplexityKey && name === "fetch_perplexity_data") {
-      headers["X-Perplexity-Key"] = perplexityKey;
-    }
-
+    const headers: Record<string, string> = { ...(extraHeaders || {}) };
     return this.callRpc("callTool", { name, arguments: args }, headers);
   }
 
