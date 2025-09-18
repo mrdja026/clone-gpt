@@ -1,0 +1,1 @@
+PowerShell junction (often succeeds when mklink fails): Run in c:\Users\Mrdjan\Documents\workspace\clone-gpt — powershell -NoProfile -Command "New-Item -ItemType Junction -Path 'hello-world-mcp' -Target 'C:\Users\Mrdjan\Documents\workspace\hello-world-mcp'"

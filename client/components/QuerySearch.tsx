@@ -20,7 +20,7 @@ interface QuerySearchProps {
 export function QuerySearch({
   queries,
   onSelect,
-  placeholder = "Search queries (Cmd/Ctrl+K)...",
+  placeholder = "Try: 'SCRUM-8', 'project WEB tree', 'search boards', or 'latest React features'...",
   className,
 }: QuerySearchProps) {
   const [open, setOpen] = useState(true);
