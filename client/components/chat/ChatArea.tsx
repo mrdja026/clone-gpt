@@ -13,6 +13,69 @@ import {
 } from "lucide-react";
 import { TabBar } from "./TabBar";
 
+/**
+ * Helpers to prettify RAW_DATA blocks and extract readable text
+ * RAW blocks are wrapped between:
+ * === RAW_DATA_BEGIN ===
+ * ```json
+ * { ... }
+ * ```
+ * === RAW_DATA_END ===
+ */
+function extractReadableFromRaw(full: string): string | null {
+  if (typeof full !== "string") return null;
+  const begin = "=== RAW_DATA_BEGIN ===";
+  const end = "=== RAW_DATA_END ===";
+  const i = full.indexOf(begin);
+  const j = full.indexOf(end);
+  if (i === -1 || j === -1 || j <= i) return null;
+
+  const rawBlock = full.slice(i + begin.length, j).trim();
+
+  // Try to pull JSON from a fenced code block first
+  const codeFenceMatch = rawBlock.match(/```json\s*([\s\S]*?)\s*```/i);
+  const jsonCandidate = codeFenceMatch ? codeFenceMatch[1] : rawBlock;
+
+  // Remove leading "💻 JSON" label if present
+  const cleaned = jsonCandidate.replace(/^[^\{\[]*💻\s*JSON\s*/i, "").trim();
+
+  // Find the first JSON-looking segment
+  const firstBrace = cleaned.indexOf("{");
+  const lastBrace = cleaned.lastIndexOf("}");
+  if (firstBrace === -1 || lastBrace === -1 || lastBrace <= firstBrace) {
+    return null;
+  }
+
+  const jsonText = cleaned.slice(firstBrace, lastBrace + 1);
+  try {
+    const obj = JSON.parse(jsonText);
+
+    // Try common shapes we use in MCP responses
+    // 1) { content: [{ type: "text", text: "..." }, ...] }
+    if (obj && Array.isArray(obj.content)) {
+      const texts = obj.content
+        .filter((c: any) => c && typeof c.text === "string")
+        .map((c: any) => c.text.trim())
+        .filter(Boolean);
+      if (texts.length) return texts.join("\n\n");
+    }
+
+    // 2) Chat/generate-like
+    if (typeof obj?.message?.content === "string") {
+      return obj.message.content.trim();
+    }
+    if (typeof obj?.response === "string") {
+      return obj.response.trim();
+    }
+
+    // 3) Fallback: return compact JSON for display
+    return JSON.stringify(obj, null, 2);
+  } catch {
+    // If we can't parse, just return null so the normal renderer handles it
+    return null;
+  }
+}
+
 // Content type detection and parsing
 interface ParsedContent {
   type: "text" | "code" | "markdown" | "structured";
@@ -350,6 +413,52 @@ function formatMessageContent(content: string): string {
   formatted = formatted.replace(/\*\*([^*]+)\*\*/g, "✨ **$1**"); // Bold text with sparkle
   formatted = formatted.replace(/(\d+)\./g, "🔢 $1."); // Numbered lists
 
+  // Ticket-specific beautification
+  formatted = formatted.replace(
+    /^JIRA Ticket:\s*(.+)$/m,
+    "🎫 **JIRA Ticket:** $1",
+  );
+  formatted = formatted.replace(
+    /^BASIC INFORMATION:\s*$/m,
+    "📋 **Basic Information:**",
+  );
+  formatted = formatted.replace(/^PEOPLE:\s*$/m, "👥 **People:**");
+  formatted = formatted.replace(/^TIMELINE:\s*$/m, "⏱️ **Timeline:**");
+  formatted = formatted.replace(/^DESCRIPTION:\s*$/m, "📝 **Description:**");
+  formatted = formatted.replace(
+    /^ACTIVE SPRINT:\s*$/m,
+    "🏃‍♂️ **Active Sprint:**",
+  );
+  formatted = formatted.replace(
+    /^SPRINT HISTORY:\s*$/m,
+    "📈 **Sprint History:**",
+  );
+  formatted = formatted.replace(/^ACTIVITY:\s*$/m, "📊 **Activity:**");
+
+  // Common field bullets → emoji bullets
+  formatted = formatted.replace(/^\s*•\s*Title:/gm, "📝 **Title:**");
+  formatted = formatted.replace(/^\s*•\s*Type:/gm, "🏷️ **Type:**");
+  formatted = formatted.replace(/^\s*•\s*Status:/gm, "📊 **Status:**");
+  formatted = formatted.replace(/^\s*•\s*Priority:/gm, "🚦 **Priority:**");
+  formatted = formatted.replace(/^\s*•\s*Project:/gm, "📁 **Project:**");
+  formatted = formatted.replace(/^\s*•\s*Assignee:/gm, "👤 **Assignee:**");
+  formatted = formatted.replace(/^\s*•\s*Reporter:/gm, "🧑‍💼 **Reporter:**");
+  formatted = formatted.replace(/^\s*•\s*Created:/gm, "📅 **Created:**");
+  formatted = formatted.replace(/^\s*•\s*Updated:/gm, "🕒 **Updated:**");
+  formatted = formatted.replace(/^\s*•\s*Due Date:/gm, "📅 **Due Date:**");
+  formatted = formatted.replace(/^\s*•\s*Name:/gm, "🏁 **Name:**");
+  formatted = formatted.replace(/^\s*•\s*State:/gm, "🔵 **State:**");
+  formatted = formatted.replace(/^\s*•\s*Start:/gm, "📆 **Start:**");
+  formatted = formatted.replace(/^\s*•\s*End:/gm, "📆 **End:**");
+  formatted = formatted.replace(/^\s*•\s*Goal:/gm, "🎯 **Goal:**");
+  formatted = formatted.replace(/^\s*•\s*Comments:/gm, "💬 **Comments:**");
+  formatted = formatted.replace(
+    /^\s*•\s*Attachments:/gm,
+    "📎 **Attachments:**",
+  );
+  formatted = formatted.replace(/^\s*•\s*Watchers:/gm, "👀 **Watchers:**");
+  formatted = formatted.replace(/^\s*•\s*Votes:/gm, "👍 **Votes:**");
+
   // Clean up multiple consecutive emojis
   formatted = formatted.replace(/(🔢\s+)(\d+\.\s+)(🎯|📖|✅|🐛|📝)/g, "$1$2$3");
 
@@ -542,9 +651,13 @@ function MessageBubble({
   const isUser = message.role === "user";
 
   // Parse the message content into different types
+  // For assistant messages, try to extract readable text from RAW_DATA JSON blocks first
+  const baseContent = isUser
+    ? message.content
+    : (extractReadableFromRaw(message.content) ?? message.content);
   const parsedContent = isUser
-    ? [{ type: "text" as const, content: message.content }]
-    : parseMessageContent(message.content);
+    ? [{ type: "text" as const, content: baseContent }]
+    : parseMessageContent(baseContent);
 
   // Check content types
   const hasCodeBlocks = parsedContent.some((part) => part.type === "code");
