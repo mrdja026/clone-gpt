@@ -6,8 +6,8 @@ import {
   HttpCode,
   HttpStatus,
   Logger,
+  Inject,
 } from "@nestjs/common";
-import { ModuleRef } from "@nestjs/core";
 import { ThirdLaneService } from "./third-lane.service";
 import {
   ThirdLaneQueryDto,
@@ -20,8 +20,8 @@ export class ThirdLaneController {
   private readonly logger = new Logger(ThirdLaneController.name);
 
   constructor(
+    @Inject(ThirdLaneService)
     private readonly thirdLaneService: ThirdLaneService,
-    private readonly moduleRef: ModuleRef,
   ) {
     this.logger.log("ThirdLaneController initialized");
     this.logger.log("ThirdLaneService injected:", !!this.thirdLaneService);
@@ -51,19 +51,8 @@ export class ThirdLaneController {
       };
     }
 
-    // Resolve service via ModuleRef if DI edge-case occurs
-    let service = this.thirdLaneService;
-    if (!service || typeof service.processQuery !== "function") {
-      this.logger.warn(
-        "Primary DI for ThirdLaneService missing; attempting ModuleRef resolution",
-      );
-      try {
-        service = this.moduleRef.get(ThirdLaneService, { strict: false });
-        this.logger.log("ModuleRef resolved ThirdLaneService:", !!service);
-      } catch (e) {
-        this.logger.error("ModuleRef.get(ThirdLaneService) failed:", e as any);
-      }
-    }
+    // Resolve service (no fallbacks needed under canonical DI)
+    const service: ThirdLaneService | undefined = this.thirdLaneService;
     if (!service || typeof service.processQuery !== "function") {
       this.logger.error(
         "ThirdLaneService is not available or improperly injected",
