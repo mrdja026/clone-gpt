@@ -36,6 +36,8 @@ export interface LaneCConfig {
   ollamaUrl: string;
   temperature?: number;
   maxTokens?: number;
+  // When true, skip two-stage flow and analyze immediately (legacy behavior)
+  directAnalysis?: boolean;
 }
 
 export interface DataAnalysisPrompt {

@@ -1665,3 +1665,76 @@ Invoke-RestMethod -Uri "http://localhost:8080/api/mcp/tool" -Method POST -Conten
 ```
 
 - UI flow: enter a deterministic search (e.g., “TypeScript generics best practices”). Expect formatted MCP section, then streamed Analysis grounded by Retrieved Data (JSON).
+
+Test plan and exact strings to validate all Jira functionalities
+
+Pre-checks
+
+Start MCP HTTP bridge:
+node hello-world-mcp/src/http-bridge.js
+Verify http://127.0.0.1:4000/health shows mcp_initialized: true
+Ensure server env configured (.env):
+MCP_BASE_URL=http://127.0.0.1:4000
+JIRA_BASE_URL, JIRA_EMAIL, JIRA_API_TOKEN set
+Optional Perplexity tests: set a key in Providers → Perplexity
+Open the UI route “/” (PostLogin). In the right-side “Jira Use Cases” panel (added in PostLoginPage.tsx), you can click Example to auto-fill or Use to enter placeholders.
+Tickets and tasks
+
+Ticket details:
+SCRUM-8
+Quick status:
+Status-SCRUM-8
+Live status:
+RealStatus-SCRUM-8
+Blockers:
+blockers for SCRUM-25
+Projects
+
+Search a specific project:
+search project SCRUM
+search project HWP
+List all projects:
+list projects
+Combined projects + boards:
+search projects with boards
+Boards
+
+List boards for a project:
+list boards for project SCRUM
+list boards for project HWP
+list boards for project HWB
+Only scrum boards for a project:
+list scrum boards for project SCRUM
+Scrum boards with active sprints:
+search scrum boards with active sprints
+Project tree (3 levels)
+
+Project → Epics → Issues → Subtasks with story points/time tracking:
+Show me the complete 3-level project tree for SCRUM
+Show me the complete 3-level project tree for HWP
+Sprints
+
+Current sprint of a project:
+project SCRUM sprint
+Generic active sprint query:
+which sprint is active right now in my scrum project?
+Release notes / updates
+
+By version:
+generate release notes for version v1.0.0
+Last update for a project:
+what can we put in release notes for the last update of SCRUM?
+Identity (optional, STDIO MCP capability)
+
+Who am I in Jira:
+whoami
+Expected behavior with two-stage Lane C
+
+For structured outputs (e.g., ticket, boards, projects, project tree, sprint):
+First response: the server returns PURE raw JSON (mode: raw_data) wrapped with RAW_DATA markers.
+To analyze: issue a follow-up like “Analyze that data for planning” or simply continue; the model answers grounded on the previously returned raw JSON (mode: general_chat).
+If no structured data is available: it will go straight to general chat.
+Where to trigger tests
+
+Quick catalog (recommended): PostLogin “Jira Use Cases” panel (Use/Example buttons), implemented in PostLoginPage.tsx using catalog from queries.ts.
+Manual input: “/chat” route for direct string entry via the chat input.

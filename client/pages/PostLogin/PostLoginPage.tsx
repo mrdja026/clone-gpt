@@ -10,9 +10,19 @@ import ChatPanel from "./components/ChatPanel";
 import ProvidersPanel from "./components/ProvidersPanel";
 import AboutPreview from "./components/AboutPreview";
 import ReasoningMode from "./components/ReasoningMode";
-import { DeterministicSearchBar } from "@/components/home/DeterministicSearchBar";
-import { jiraDeterministicPrompts } from "@/content/jira-placeholders";
 import { Brain } from "lucide-react";
+import { jiraUseCaseGroups } from "@/lib/queries";
+import type { JiraUseCaseItem } from "@/lib/queries";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const providers = [
   {
@@ -46,14 +56,66 @@ export default function PostLoginPage() {
     isReasoningAvailable,
   } = usePostLogin();
 
-  const handleApplyQuery = async (query: string) => {
-    setPendingPrompt(query);
-    await onSend(query);
-  };
+  // Helper to fill template placeholders like {TICKET_KEY}
+  function fillTemplate(tmpl: string, kv: Record<string, string>) {
+    return tmpl.replace(/\{([A-Z_]+)\}/g, (_, name) => {
+      return kv[name] ?? `{${name}}`;
+    });
+  }
 
-  const handleTemplateSelect = (template: string) => {
-    setSearchQuery(template);
-  };
+  async function handleUseCase(item: {
+    id: string;
+    label: string;
+    template: string;
+    friendly?: string;
+    placeholders?: Array<{
+      name: string;
+      hint?: string;
+      example?: string;
+      validator?: string;
+    }>;
+    exampleFilled?: string;
+  }) {
+    // If placeholders are defined, collect values via prompt (MVP UX)
+    const values: Record<string, string> = {};
+    if (item.placeholders && item.placeholders.length > 0) {
+      for (const ph of item.placeholders) {
+        // eslint-disable-next-line no-alert
+        const val = window.prompt(
+          `Enter ${ph.name}${ph.hint ? ` (${ph.hint})` : ""}${ph.example ? `, e.g. ${ph.example}` : ""}:`,
+          ph.example || "",
+        );
+        if (val == null || val.trim() === "") {
+          // User cancelled or empty — abort
+          return;
+        }
+        const trimmed = val.trim();
+        if (ph.validator) {
+          try {
+            const re = new RegExp(ph.validator);
+            if (!re.test(trimmed)) {
+              // eslint-disable-next-line no-alert
+              window.alert(
+                `Value "${trimmed}" does not match expected format for ${ph.name}.`,
+              );
+              return;
+            }
+          } catch {
+            // ignore invalid regex
+          }
+        }
+        values[ph.name] = trimmed;
+      }
+    }
+
+    const finalPrompt =
+      item.placeholders && item.placeholders.length > 0
+        ? fillTemplate(item.template, values)
+        : item.template;
+
+    setPendingPrompt(finalPrompt);
+    // Keep user on PostLogin page per current flow; ChatPanel will pick up pendingPrompt
+  }
 
   return (
     <div className="min-h-screen grid grid-rows-[auto,1fr]">
@@ -128,7 +190,75 @@ export default function PostLoginPage() {
             aria-label="Context"
           >
             <ProvidersPanel providers={providers} />
-            <AboutPreview />
+
+            {/* Jira Use Cases Catalog */}
+            <section className="rounded-xl border p-4 bg-card">
+              <h3 className="font-medium mb-2">Jira Use Cases</h3>
+              <div className="space-y-4">
+                {jiraUseCaseGroups.map((group) => (
+                  <div key={group.title} className="space-y-2">
+                    <div className="text-sm font-medium">{group.title}</div>
+                    {group.description && (
+                      <div className="text-xs text-muted-foreground">
+                        {group.description}
+                      </div>
+                    )}
+                    <div className="space-y-2 mt-2">
+                      {group.items.map((item) => (
+                        <div
+                          key={item.id}
+                          className="rounded-md border bg-background p-2"
+                          data-testid={`usecase-${item.id}`}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <div className="text-sm font-medium">
+                                {item.label}
+                              </div>
+                              {item.friendly && (
+                                <div className="text-xs text-muted-foreground mt-1">
+                                  {item.friendly}
+                                </div>
+                              )}
+                              {item.placeholders &&
+                                item.placeholders.length > 0 && (
+                                  <div className="text-[11px] mt-1 text-muted-foreground">
+                                    Placeholders:{" "}
+                                    {item.placeholders
+                                      .map((p) => p.name)
+                                      .join(", ")}
+                                  </div>
+                                )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {item.exampleFilled && (
+                                <button
+                                  className="text-xs px-2 py-1 rounded-md border hover:bg-accent hover:text-accent-foreground"
+                                  onClick={() =>
+                                    setPendingPrompt(item.exampleFilled!)
+                                  }
+                                  title="Use example"
+                                  data-testid={`usecase-example-${item.id}`}
+                                >
+                                  Example
+                                </button>
+                              )}
+                              <button
+                                className="text-xs px-2 py-1 rounded-md border bg-primary text-primary-foreground hover:opacity-90"
+                                onClick={() => handleUseCase(item)}
+                                data-testid={`usecase-use-${item.id}`}
+                              >
+                                Use
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
           </aside>
         </div>
       </main>

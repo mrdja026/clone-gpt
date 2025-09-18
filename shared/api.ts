@@ -296,7 +296,7 @@ export interface LaneCOutput {
   insights: string[];
   recommendations: string[];
   confidence: number;
-  mode: "data_analysis" | "general_chat";
+  mode: "data_analysis" | "general_chat" | "raw_data";
 }
 
 export interface ThirdLaneRequest {

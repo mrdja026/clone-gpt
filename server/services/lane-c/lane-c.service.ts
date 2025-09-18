@@ -20,6 +20,11 @@ export class LaneCService {
   private readonly logger = new Logger(LaneCService.name);
   private readonly config: LaneCConfig;
 
+  // Two-stage pipeline markers and limits
+  private static readonly RAW_BEGIN = "=== RAW_DATA_BEGIN ===";
+  private static readonly RAW_END = "=== RAW_DATA_END ===";
+  private static readonly RAW_MAX_CHARS = 120000;
+
   constructor(private configService: ConfigService) {
     this.logger.log("LaneCService constructor called");
     this.logger.log("ConfigService exists:", !!this.configService);
@@ -34,6 +39,9 @@ export class LaneCService {
         ollamaUrl: process.env.OLLAMA_URL || `http://${laneCHost}/api/chat`,
         temperature: parseFloat(process.env.LANE_C_TEMPERATURE || "0.7"),
         maxTokens: parseInt(process.env.LANE_C_MAX_TOKENS || "2048"),
+        directAnalysis:
+          process.env.LANE_C_DIRECT_ANALYSIS === "1" ||
+          /^true$/i.test(process.env.LANE_C_DIRECT_ANALYSIS || ""),
       };
     } else {
       const laneCHost = this.configService.get<string>(
@@ -48,6 +56,12 @@ export class LaneCService {
         ),
         temperature: this.configService.get<number>("LANE_C_TEMPERATURE", 0.7),
         maxTokens: this.configService.get<number>("LANE_C_MAX_TOKENS", 2048),
+        directAnalysis:
+          this.configService.get<string>("LANE_C_DIRECT_ANALYSIS", "0") ===
+            "1" ||
+          /^true$/i.test(
+            this.configService.get<string>("LANE_C_DIRECT_ANALYSIS", "0") || "",
+          ),
       };
     }
 
@@ -64,18 +78,38 @@ export class LaneCService {
     this.logger.log(`Processing Lane C analysis for query: ${input.userQuery}`);
 
     try {
-      // Determine if we have structured data or should do general chat
+      // Determine if we have structured data from Lane B
       const hasStructuredData =
         input.rawData?.metadata?.status === "success" &&
         input.rawData.rawJson &&
         Object.keys(input.rawData.rawJson).length > 0;
 
-      if (hasStructuredData) {
-        return await this.performDataAnalysis(input);
-      } else {
+      // Detect whether RAW data was already emitted in this conversation
+      const rawEmitted =
+        Array.isArray(input.chatHistory) &&
+        input.chatHistory.some(
+          (m) =>
+            m.role === "assistant" &&
+            typeof m.content === "string" &&
+            m.content.includes(LaneCService.RAW_BEGIN),
+        );
+
+      // Default: two-stage flow (raw -> analysis). Legacy direct analysis can be enabled via config.
+      if (hasStructuredData && !this.config.directAnalysis) {
+        if (!rawEmitted) {
+          // Phase 1: Return pure raw data (no LLM call)
+          return this.emitRawDataResponse(input);
+        }
+        // Phase 2: Perform grounded analysis that references raw data from history
         return await this.performGeneralChat(input);
       }
-    } catch (error) {
+
+      // No structured data or legacy direct analysis enabled
+      if (hasStructuredData && this.config.directAnalysis) {
+        return await this.performDataAnalysis(input);
+      }
+      return await this.performGeneralChat(input);
+    } catch (error: any) {
       this.logger.error(`Error in Lane C processing: ${error.message}`);
       return this.createFallbackResponse(input, error.message);
     }
@@ -108,21 +142,42 @@ export class LaneCService {
   }
 
   private async performGeneralChat(input: LaneCInput): Promise<LaneCOutput> {
-    this.logger.log("Performing general chat (no structured data available)");
+    this.logger.log(
+      "Performing general chat (may use structured raw data as context)",
+    );
 
     const prompt = this.buildGeneralChatPrompt(input);
+
+    // Try to recover previously emitted RAW data from chat history,
+    // otherwise fall back to current input.rawData (truncated).
+    const rawBlockFromHistory = this.extractRawBlockFromHistory(
+      input.chatHistory || [],
+    );
+    let rawContext: string | undefined = rawBlockFromHistory;
+
+    if (!rawContext && input.rawData?.rawJson) {
+      const jsonStr = this.safeStringifyTruncated(
+        input.rawData.rawJson,
+        LaneCService.RAW_MAX_CHARS,
+      );
+      rawContext = `${LaneCService.RAW_BEGIN}\n\`\`\`json\n${jsonStr}\n\`\`\`\n${LaneCService.RAW_END}`;
+    }
+
+    // Build final user prompt that grounds on raw data (if available)
+    const groundedUserPrompt = rawContext
+      ? `${prompt.userPrompt}
+
+Use only the information contained in the following previously returned raw data. Do not fabricate fields. If the raw data is insufficient, state the limitation clearly.
+
+${rawContext}`
+      : prompt.userPrompt;
+
     const messages: OllamaChatRequest["messages"] = [
-      {
-        role: "system",
-        content: prompt.systemPrompt,
-      },
-      {
-        role: "user",
-        content: prompt.userPrompt,
-      },
+      { role: "system", content: prompt.systemPrompt },
+      { role: "user", content: groundedUserPrompt },
     ];
 
-    // Add chat history for continuity
+    // Add chat history for continuity (excluding large RAW blocks to avoid duplication)
     if (input.chatHistory && input.chatHistory.length > 0) {
       const contextMessages = this.buildContextFromHistory(input.chatHistory);
       messages.splice(1, 0, ...contextMessages);
@@ -205,6 +260,61 @@ Please provide a helpful response to this query.`,
       role: msg.role === "assistant" ? "assistant" : "user",
       content: msg.content,
     }));
+  }
+
+  // Extract previously emitted RAW block from history if present
+  private extractRawBlockFromHistory(
+    chatHistory: ChatMessage[],
+  ): string | undefined {
+    try {
+      const assistantMsgs = chatHistory
+        .filter((m) => m.role === "assistant" && typeof m.content === "string")
+        .map((m) => m.content);
+      for (let i = assistantMsgs.length - 1; i >= 0; i--) {
+        const c = assistantMsgs[i];
+        const start = c.indexOf(LaneCService.RAW_BEGIN);
+        const end = c.indexOf(LaneCService.RAW_END);
+        if (start !== -1 && end !== -1 && end > start) {
+          return c.slice(start, end + LaneCService.RAW_END.length);
+        }
+      }
+    } catch {}
+    return undefined;
+  }
+
+  // Safe JSON stringify with truncation protection
+  private safeStringifyTruncated(obj: any, maxChars: number): string {
+    try {
+      const s = JSON.stringify(obj, null, 2);
+      if (s.length <= maxChars) return s;
+      const head = s.slice(0, Math.floor(maxChars * 0.6));
+      const tail = s.slice(-Math.floor(maxChars * 0.35));
+      return `${head}\n/* ... truncated ... */\n${tail}`;
+    } catch (e: any) {
+      return String(obj);
+    }
+  }
+
+  // Emit raw data response without calling the model
+  private emitRawDataResponse(input: LaneCInput): LaneCOutput {
+    const pretty = this.safeStringifyTruncated(
+      input.rawData?.rawJson ?? {},
+      LaneCService.RAW_MAX_CHARS,
+    );
+
+    const body = `${LaneCService.RAW_BEGIN}
+\`\`\`json
+${pretty}
+\`\`\`
+${LaneCService.RAW_END}`;
+
+    return {
+      analysis: body,
+      insights: [],
+      recommendations: [],
+      confidence: 0.9,
+      mode: "raw_data",
+    };
   }
 
   private async callOllamaModel(
