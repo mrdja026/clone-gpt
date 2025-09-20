@@ -37,11 +37,31 @@ export class McpService {
     return !(fixtures === "0" || fixtures.toLowerCase?.() === "false");
   }
 
+  private normalizeMethod(method: string) {
+    switch (method) {
+      case "listTools":
+      case "tools/list":
+        return "tools/list";
+      case "callTool":
+      case "tools/call":
+        return "tools/call";
+      case "listResources":
+      case "resources/list":
+        return "resources/list";
+      case "readResource":
+      case "resources/read":
+        return "resources/read";
+      default:
+        return method;
+    }
+  }
+
   private async callRpc<T = any>(
     method: string,
     params?: any,
     headers?: Record<string, string>,
   ): Promise<T> {
+    const normalizedMethod = this.normalizeMethod(method);
     const base = this.getMcpBaseUrl();
     const forwardOnly = this.isForwardOnlyMode();
     const fixtures = this.isFixturesMode();
@@ -62,9 +82,15 @@ export class McpService {
           ...headers,
         };
 
+        // Drop hop-by-hop headers that break JSON-RPC proxying
+        delete requestHeaders["content-length"];
+        delete requestHeaders["Content-Length"];
+        delete requestHeaders["host"];
+        delete requestHeaders["Host"];
+
         const res = await axios.post(
           url,
-          { jsonrpc: "2.0", id: Date.now(), method, params },
+          { jsonrpc: "2.0", id: Date.now(), method: normalizedMethod, params },
           {
             timeout: 65000,
             headers: requestHeaders,
@@ -93,21 +119,27 @@ export class McpService {
     // Fixtures/Adapter mode (default): dispatch locally
     if (fixtures) {
       // Emulate JSON-RPC dispatch using fixtures adapter
-      switch (method) {
-        case "listTools":
+      switch (normalizedMethod) {
         case "tools/list":
+        case "listTools":
           return fixturesListTools() as any;
-        case "listResources":
         case "resources/list":
+        case "listResources":
           return fixturesListResources() as any;
-        case "callTool":
         case "tools/call":
-          return fixturesCallTool(params?.name, params?.arguments, headers) as any;
-        case "readResource":
+        case "callTool":
+          return fixturesCallTool(
+            params?.name,
+            params?.arguments,
+            headers,
+          ) as any;
         case "resources/read":
+        case "readResource":
           return fixturesReadResource(params?.uri) as any;
         default:
-          throw new Error(`Unknown MCP method in fixtures mode: ${method}`);
+          throw new Error(
+            `Unknown MCP method in fixtures mode: ${normalizedMethod}`,
+          );
       }
     }
 
@@ -118,11 +150,11 @@ export class McpService {
   }
 
   async listTools() {
-    return this.callRpc("listTools");
+    return this.callRpc("tools/list");
   }
 
   async listResources() {
-    return this.callRpc("listResources");
+    return this.callRpc("resources/list");
   }
 
   async callTool(
@@ -131,10 +163,10 @@ export class McpService {
     extraHeaders?: Record<string, string>,
   ) {
     const headers: Record<string, string> = { ...(extraHeaders || {}) };
-    return this.callRpc("callTool", { name, arguments: args }, headers);
+    return this.callRpc("tools/call", { name, arguments: args }, headers);
   }
 
   async readResource(uri: string) {
-    return this.callRpc("readResource", { uri });
+    return this.callRpc("resources/read", { uri });
   }
 }

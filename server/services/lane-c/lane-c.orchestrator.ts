@@ -245,14 +245,22 @@ export class ThirdLaneOrchestrator {
     laneAOutput?: LaneAOutput,
     userQuery?: string,
   ): Promise<ThirdLaneResponse> {
+    const normalizedMode: ThirdLaneResponse["mode"] =
+      laneCOutput.mode === "raw_data"
+        ? "data_analysis"
+        : laneCOutput.mode;
+
     const response: ThirdLaneResponse = {
       response: laneCOutput.analysis,
-      mode: laneCOutput.mode,
+      mode: normalizedMode,
       chatId,
     };
 
     // Include analysis details if in data analysis mode
-    if (laneCOutput.mode === "data_analysis") {
+    const includeAnalysis =
+      laneCOutput.mode === "data_analysis" || laneCOutput.mode === "raw_data";
+
+    if (includeAnalysis) {
       response.analysis = {
         insights: laneCOutput.insights,
         recommendations: laneCOutput.recommendations,
