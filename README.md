@@ -127,6 +127,12 @@ curl -s -X POST http://localhost:8080/api/mcp/tool \
   -d '{"name":"fetch_perplexity_data","arguments":{"query":"test"}}' | jq
 ```
 
+### MCP Compatibility Notes (2025-09-20)
+
+- The Nest MCP service now normalizes JSON-RPC method names to the canonical `tools/*` and `resources/*` verbs before forwarding requests, preventing external bridges from rejecting alias names like `listTools`.
+- Fixture adapters return MCP-compliant envelopes (`content[]` with both `text` and `json` payloads), so local development mirrors the structure produced by real MCP servers.
+- Forward-only mode was smoke-tested against the companion MCP project at `C:/Users/Mrdjan/Documents/workspace/hello-world-mcp`, using the `add_numbers` tool as a sanity check.
+
 ### Troubleshooting Test Scenario
 
 **Common Issues and Solutions:**

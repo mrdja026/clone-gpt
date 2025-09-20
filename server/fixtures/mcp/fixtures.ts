@@ -11,6 +11,57 @@ type Tool = {
   inputSchema?: any;
 };
 
+type McpTextContent = {
+  type: "text";
+  text: string;
+};
+
+type McpJsonContent = {
+  type: "json";
+  json: unknown;
+};
+
+type ToolEnvelope = {
+  content: Array<McpTextContent | McpJsonContent>;
+};
+
+function wrapResult(result: unknown): ToolEnvelope {
+  if (
+    result &&
+    typeof result === "object" &&
+    "content" in (result as Record<string, unknown>)
+  ) {
+    return result as ToolEnvelope;
+  }
+
+  if (typeof result === "string") {
+    return {
+      content: [
+        {
+          type: "text",
+          text: result,
+        },
+      ],
+    };
+  }
+
+  const jsonPayload = result ?? {};
+  const text = JSON.stringify(jsonPayload, null, 2);
+
+  return {
+    content: [
+      {
+        type: "text",
+        text,
+      },
+      {
+        type: "json",
+        json: jsonPayload,
+      },
+    ],
+  };
+}
+
 // ---- Tool registry (no Perplexity tools yet) ----
 const tools: Tool[] = [
   {
@@ -380,19 +431,19 @@ export async function fixturesCallTool(
   switch (name) {
     case "fetch_ticket":
     case "fetch_jira_ticket":
-      return handleFetchTicket(args);
+      return wrapResult(handleFetchTicket(args));
     case "fetch_jira_project_tree":
-      return handleProjectTree(args);
+      return wrapResult(handleProjectTree(args));
     case "search_jira_projects":
-      return handleSearchProjects(args);
+      return wrapResult(handleSearchProjects(args));
     case "fetch_current_sprint":
-      return handleCurrentSprint(args);
+      return wrapResult(handleCurrentSprint(args));
     case "search_projects_with_boards":
-      return handleProjectsWithBoards(args);
+      return wrapResult(handleProjectsWithBoards(args));
     case "process_text":
-      return handleProcessText(args);
+      return wrapResult(handleProcessText(args));
     default:
-      return { error: `Unknown tool: ${name}` };
+      return wrapResult({ error: `Unknown tool: ${name}` });
   }
 }
 
