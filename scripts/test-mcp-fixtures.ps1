@@ -14,7 +14,7 @@ $summary = [pscustomobject]@{
   port = $health.port
   host = $health.host
   effectiveBaseUrl = $health.effectiveBaseUrl
-  fixtures = $health.env.MCP_USE_FIXTURES
+  mcpBaseUrl = $health.env.MCP_BASE_URL
   proxyPort = $health.ollamaProxy.port
 }
 $summary | ConvertTo-Json -Depth 5 | Write-Output

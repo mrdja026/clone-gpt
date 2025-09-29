@@ -31,8 +31,6 @@ export class DemoController {
       port,
       host,
       env: {
-        MCP_USE_FIXTURES: process.env.MCP_USE_FIXTURES || "",
-        MCP_FORWARD_ONLY: process.env.MCP_FORWARD_ONLY || "",
         MCP_BASE_URL: process.env.MCP_BASE_URL || "",
         JIRA_BASE_URL: process.env.JIRA_BASE_URL ? "set" : "",
         OPENAI_BASE_URL: process.env.OPENAI_BASE_URL || "",

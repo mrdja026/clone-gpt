@@ -129,7 +129,7 @@ export default function PostLogin() {
                 ...c,
                 messages: c.messages.map((m) =>
                   m.id === botMessageId
-                    ? { ...m, content: "🔍 Fetching data from JIRA..." }
+                    ? { ...m, content: "Fetching data from JIRA..." }
                     : m,
                 ),
               }
@@ -147,7 +147,7 @@ export default function PostLogin() {
                 : response.contents?.[0]?.text) || "No data returned";
             return formatMCPResponse(action, responseText);
           } catch (err) {
-            return `❌ Failed to execute ${action.description}: ${err instanceof Error ? err.message : "Unknown error"}`;
+            return `Failed to execute ${action.description}: ${err instanceof Error ? err.message : "Unknown error"}`;
           }
         });
         const mcpResultsArray = await Promise.all(mcpPromises);
@@ -167,7 +167,7 @@ export default function PostLogin() {
                     m.id === botMessageId
                       ? {
                           ...m,
-                          content: `${mcpResults}\n\n🤖 Analyzing data...`,
+                          content: `${mcpResults}\n\nAnalyzing data...`,
                         }
                       : m,
                   ),
@@ -176,7 +176,7 @@ export default function PostLogin() {
           ),
         );
       } catch (err) {
-        mcpResults = `❌ Failed to retrieve data: ${err instanceof Error ? err.message : "Unknown error"}`;
+        mcpResults = `Failed to retrieve data: ${err instanceof Error ? err.message : "Unknown error"}`;
         setConversations((prev) =>
           prev.map((c) =>
             c.id === activeId

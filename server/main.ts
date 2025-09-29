@@ -2,7 +2,11 @@ import "reflect-metadata";
 import { NestFactory } from "@nestjs/core";
 import { ValidationPipe } from "@nestjs/common";
 import { AppModule } from "./app.module";
-import { startOllamaProxyIfNeeded, getOllamaProxyStatus, getEffectiveOllamaBaseUrl } from "./utils/ollama-proxy";
+import {
+  startOllamaProxyIfNeeded,
+  getOllamaProxyStatus,
+  getEffectiveOllamaBaseUrl,
+} from "./utils/ollama-proxy";
 import { publishHealthSnapshot, upstashEnabled } from "./utils/upstash";
 import { measureMcpLatency } from "./middleware/timing";
 
@@ -56,7 +60,7 @@ async function bootstrap() {
         port: String(port),
         host,
         env: {
-          MCP_USE_FIXTURES: process.env.MCP_USE_FIXTURES || "",
+          MCP_BASE_URL: process.env.MCP_BASE_URL || "",
           JIRA_BASE_URL: process.env.JIRA_BASE_URL ? "set" : "",
           OPENAI_BASE_URL: process.env.OPENAI_BASE_URL || "",
           MODEL_NAME: process.env.MODEL_NAME || "",
@@ -79,10 +83,15 @@ async function bootstrap() {
             const ok2 = await publishHealthSnapshot(key, makeHealth());
             if (!ok2) console.warn("[Upstash] periodic publish returned false");
           } catch (e) {
-            console.warn("[Upstash] periodic publish failed:", (e as any)?.message || e);
+            console.warn(
+              "[Upstash] periodic publish failed:",
+              (e as any)?.message || e,
+            );
           }
         }, intervalSec * 1000).unref?.();
-        console.log(`[Upstash] periodic publishing every ${intervalSec}s to key='${key}'`);
+        console.log(
+          `[Upstash] periodic publishing every ${intervalSec}s to key='${key}'`,
+        );
       }
     } else {
       console.log("[Upstash] disabled (missing env)");

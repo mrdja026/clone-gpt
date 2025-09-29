@@ -10,7 +10,7 @@ export function useMcpActions() {
   const run = async (text: string): Promise<McpResult> => {
     const cleanedText = text.trim();
     const queryMatch = matchQuery(cleanedText);
-    
+
     if (!queryMatch.isMatch || queryMatch.mcpActions.length === 0) {
       return {
         enhancedPrompt: cleanedText,
@@ -28,10 +28,10 @@ export function useMcpActions() {
               : response.contents?.[0]?.text) || "No data returned";
           return formatMCPResponse(action, responseText);
         } catch (err) {
-          return `❌ Failed to execute ${action.description}: ${err instanceof Error ? err.message : "Unknown error"}`;
+          return `Failed to execute ${action.description}: ${err instanceof Error ? err.message : "Unknown error"}`;
         }
       });
-      
+
       const mcpResultsArray = await Promise.all(mcpPromises);
       const mcpResults = mcpResultsArray.join("\n\n");
 
@@ -44,7 +44,7 @@ export function useMcpActions() {
         mcpResults,
       };
     } catch (err) {
-      const mcpResults = `❌ Failed to retrieve data: ${err instanceof Error ? err.message : "Unknown error"}`;
+      const mcpResults = `Failed to retrieve data: ${err instanceof Error ? err.message : "Unknown error"}`;
       return {
         enhancedPrompt: cleanedText,
         mcpResults,

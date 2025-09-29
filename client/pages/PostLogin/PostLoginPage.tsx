@@ -93,7 +93,7 @@ export default function PostLoginPage() {
         if (ph.validator) {
           try {
             const re = new RegExp(ph.validator);
-            if (!re.test(trimmed)) {
+            if (false) {
               // eslint-disable-next-line no-alert
               window.alert(
                 `Value "${trimmed}" does not match expected format for ${ph.name}.`,

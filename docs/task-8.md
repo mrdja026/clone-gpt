@@ -536,11 +536,10 @@ Successfully refactored both repositories to implement a clean forward-only MCP 
 
 ### clone-gpt Changes
 
-1. **Forward-only MCP service** with `MCP_FORWARD_ONLY=1` default
+1. **External-only MCP service** requiring `MCP_BASE_URL`
 2. **Enhanced error handling** for MCP connection failures
-3. **Updated env.example** with forward-only defaults
-4. **Preserved legacy mode** behind `MCP_FORWARD_ONLY=0`
-5. **Documentation updates** for new architecture
+3. **Updated env.example** with external MCP default
+4. **Documentation updates** for new architecture (fixtures/legacy removed)
 
 ## 📋 Configuration Applied
 
@@ -560,8 +559,7 @@ JIRA_API_TOKEN=your_jira_token
 ### clone-gpt (.env)
 
 ```bash
-# MCP Configuration (Forward-only by default)
-MCP_FORWARD_ONLY=1                    # Enable forward-only mode
+# MCP Configuration (External-only)
 MCP_BASE_URL=http://127.0.0.1:4000    # External MCP server endpoint
 
 # Local LLM Configuration (Ollama)

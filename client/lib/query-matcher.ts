@@ -297,6 +297,172 @@ export function matchQuery(userInput: string): QueryMatch {
   const input = userInput.toLowerCase().trim();
   const originalInput = userInput.trim();
 
+  // High-confidence explicit intents
+  if (
+    /\b(list|show|get)\b.*\bprojects\b/.test(input) ||
+    /\ball\s+projects\b/.test(input)
+  ) {
+    return {
+      isMatch: true,
+      confidence: 0.97,
+      originalQuery: userInput,
+      mcpActions: [
+        {
+          toolName: "search_jira_projects",
+          args: { status: "live", maxResults: 25 },
+          description: "Searching for all projects",
+          type: "tool",
+        },
+      ],
+      enhancedPrompt:
+        "Provide a concise overview of the projects returned below. Group by project type and highlight useful identifiers.",
+    };
+  }
+
+  if (/\b(list|show|get|find)\b.*\bboards\b/.test(input)) {
+    return {
+      isMatch: true,
+      confidence: 0.92,
+      originalQuery: userInput,
+      mcpActions: [
+        {
+          toolName: "search_jira_boards",
+          args: {
+            includeConfig: true,
+            includeActiveSprints: true,
+            includeProjects: true,
+            maxResults: 10,
+          },
+          description: "Searching for boards",
+          type: "tool",
+        },
+      ],
+      enhancedPrompt:
+        "Summarize the boards, their configurations, and any active sprints from the data below.",
+    };
+  }
+
+  // "project <KEY>" explicit intent (avoid matching "project tree <KEY>")
+  {
+    const m = originalInput.match(
+      /\bproject\s+(?!tree\b)([A-Za-z][A-Za-z0-9-]+)\b/,
+    );
+    if (m) {
+      const projectKey = m[1].toUpperCase();
+      return {
+        isMatch: true,
+        confidence: 0.95,
+        originalQuery: userInput,
+        mcpActions: [
+          {
+            toolName: "search_jira_projects",
+            args: { query: projectKey, status: "live", maxResults: 10 },
+            description: `Searching for project ${projectKey}`,
+            type: "tool",
+          },
+        ],
+        enhancedPrompt: `Summarize details for project ${projectKey} from the data below.`,
+      };
+    }
+  }
+
+  // "boards in/for/of <KEY>"
+  {
+    const m = originalInput.match(
+      /\bboards?\s+(?:in|for|of)\s+([A-Za-z][A-Za-z0-9-]+)\b/i,
+    );
+    if (m) {
+      const projectKeyOrId = m[1].toUpperCase();
+      return {
+        isMatch: true,
+        confidence: 0.93,
+        originalQuery: userInput,
+        mcpActions: [
+          {
+            toolName: "search_jira_boards",
+            args: {
+              projectKeyOrId,
+              includeConfig: true,
+              includeActiveSprints: true,
+              includeProjects: true,
+              maxResults: 10,
+            },
+            description: `Searching for boards in ${projectKeyOrId}`,
+            type: "tool",
+          },
+        ],
+        enhancedPrompt: `Summarize boards for ${projectKeyOrId} including active sprints and key configuration.`,
+      };
+    }
+  }
+
+  // "projects with boards" combined intent
+  if (/\bprojects?\b/.test(input) && /\bboards?\b/.test(input)) {
+    return {
+      isMatch: true,
+      confidence: 0.9,
+      originalQuery: userInput,
+      mcpActions: [
+        {
+          toolName: "search_projects_with_boards",
+          args: { includeConfig: true, includeActiveSprints: true },
+          description: "Finding projects with their boards",
+          type: "tool",
+        },
+      ],
+      enhancedPrompt:
+        "Provide a concise mapping of projects to boards and highlight active sprints.",
+    };
+  }
+
+  // "project tree <KEY>" explicit intent
+  {
+    const m = originalInput.match(
+      /\bproject\s+tree\s+([A-Za-z][A-Za-z0-9-]+)\b/i,
+    );
+    if (m) {
+      const projectKeyOrId = m[1].toUpperCase();
+      return {
+        isMatch: true,
+        confidence: 0.95,
+        originalQuery: userInput,
+        mcpActions: [
+          {
+            toolName: "fetch_jira_project_tree",
+            args: { projectKeyOrId, pageSize: 100 },
+            description: `Fetching project tree for ${projectKeyOrId}`,
+            type: "tool",
+          },
+        ],
+        enhancedPrompt: `Provide a compact overview of the ${projectKeyOrId} project tree.`,
+      };
+    }
+  }
+
+  // "list all issues for <KEY>" intent (use project tree to enumerate issues)
+  {
+    const m = originalInput.match(
+      /\b(list|show|get)\b.*\bissues?\b.*\b(for|in|of)\b\s+([A-Za-z][A-Za-z0-9-]+)\b/i,
+    );
+    if (m) {
+      const projectKeyOrId = m[3].toUpperCase();
+      return {
+        isMatch: true,
+        confidence: 0.95,
+        originalQuery: userInput,
+        mcpActions: [
+          {
+            toolName: "fetch_jira_project_tree",
+            args: { projectKeyOrId, pageSize: 200 },
+            description: `Fetching issues (tree) for ${projectKeyOrId}`,
+            type: "tool",
+          },
+        ],
+        enhancedPrompt: `From the project tree for ${projectKeyOrId}, list the issues with key details.`,
+      };
+    }
+  }
+
   // Lane B Enhanced: High-priority JIRA key detection using proven regex pattern
   const laneBJiraKey = originalInput.match(/\b([A-Z][A-Z0-9]+-\d+)\b/);
   if (laneBJiraKey) {
@@ -345,21 +511,22 @@ export function matchQuery(userInput: string): QueryMatch {
   ) {
     const ticketIds = extractTicketIds(originalInput);
     if (ticketIds.length > 0) {
-      // Use process_text tool if query includes Status-TICKET or RealStatus-TICKET pattern
+      // Map Status/RealStatus patterns to direct ticket fetch
       if (originalInput.match(/\b(Status|RealStatus)-([A-Z][A-Z0-9]+-\d+)\b/)) {
+        const ticketKey = ticketIds[0];
         return {
           isMatch: true,
           confidence: 0.99,
           originalQuery: userInput,
           mcpActions: [
             {
-              toolName: "process_text",
-              args: { text: originalInput },
-              description: `Processing text command for ticket ${ticketIds[0]} (Lane B enhanced)`,
+              toolName: "fetch_ticket",
+              args: { ticketKey },
+              description: `Fetching JIRA ticket ${ticketKey}`,
               type: "tool",
             },
           ],
-          enhancedPrompt: `You are in strict analysis mode. Only use the 'Retrieved Data' below that comes from the MCP JIRA tool. If no data is present, reply: "No JIRA data found for ${ticketIds[0]}". Do not infer or hallucinate.`,
+          enhancedPrompt: `You are in strict analysis mode. Only use the 'Retrieved Data' below that comes from the MCP JIRA tool. If no data is present, reply: "No JIRA data found for ${ticketKey}". Do not infer or hallucinate.`,
         };
       } else {
         // Lane B Enhanced: Use proven fetch_ticket tool format for better compatibility
@@ -592,21 +759,22 @@ export function matchQuery(userInput: string): QueryMatch {
   if (input.includes("issue") || input.includes("task")) {
     const jiraKeys = extractJiraKeys(originalInput);
     if (jiraKeys.length > 0) {
-      // Use process_text tool if query includes Status-TICKET or RealStatus-TICKET pattern
+      // Map Status/RealStatus patterns to direct ticket fetch
       if (originalInput.match(/\b(Status|RealStatus)-([A-Z][A-Z0-9]+-\d+)\b/)) {
+        const ticketKey = jiraKeys[0];
         return {
           isMatch: true,
           confidence: 0.99,
           originalQuery: userInput,
           mcpActions: [
             {
-              toolName: "process_text",
-              args: { text: originalInput },
-              description: `Processing text command for ticket ${jiraKeys[0]} (Lane B enhanced)`,
+              toolName: "fetch_ticket",
+              args: { ticketKey },
+              description: `Fetching JIRA ticket ${ticketKey}`,
               type: "tool",
             },
           ],
-          enhancedPrompt: `You are in strict analysis mode. Only use the 'Retrieved Data' from MCP JIRA to answer. If it is empty or an error, state that no data was retrieved for ${jiraKeys[0]} and stop. Do not hallucinate.`,
+          enhancedPrompt: `You are in strict analysis mode. Only use the 'Retrieved Data' from MCP JIRA to answer. If it is empty or an error, state that no data was retrieved for ${ticketKey} and stop. Do not hallucinate.`,
         };
       } else {
         // Lane B Enhanced: Use proven fetch_ticket tool format for better compatibility
@@ -699,9 +867,9 @@ export function matchQuery(userInput: string): QueryMatch {
       originalQuery: userInput,
       mcpActions: [
         {
-          toolName: "process_text",
-          args: { text: originalInput },
-          description: `Processing ${isRealStatus ? "live " : ""}status command for ticket ${ticketKey}`,
+          toolName: "fetch_ticket",
+          args: { ticketKey },
+          description: `Fetching JIRA ticket ${ticketKey}`,
           type: "tool",
         },
       ],
@@ -829,24 +997,15 @@ export function formatMCPResponse(action: MCPAction, response: any): string {
     const identifier = action.toolName || action.resourceUri;
 
     switch (identifier) {
-      case "process_text": // dumbing down the process @mrdjanstajic
+      case "process_text": // deprecated; keep for backward compatibility but format generically
       case "fetch_jira_ticket":
       case "fetch_ticket": // Lane B's proven tool name
         // Handle error case first
         if (data.error || data.status === "error") {
-          return `⚠️ **Error:** ${data.error || "Unknown error"}
-📝 **Details:** ${data.message || "No additional details available."}
-`;
+          return `Error: ${data.error || "Unknown error"}\nDetails: ${data.message || "No additional details available."}`;
         }
-        // Normal response - Lane B enhanced formatting
-        return `**JIRA Ticket: ${data.key}** (Lane B enhanced)
-📋 **Summary:** ${data.summary}
-📊 **Status:** ${data.status}
-👤 **Assignee:** ${data.assignee || "Unassigned"}
-⚡ **Priority:** ${data.priority || "Normal"}
-📝 **Description:** ${data.description}
-${data.blockers && data.blockers.length > 0 ? `🚫 **Blockers:**\n${data.blockers.map((b: string) => `  • ${b}`).join("\n")}` : ""}
-`;
+        // Normal response - emoji-free formatting
+        return `JIRA Ticket: ${data.key}\nSummary: ${data.summary}\nStatus: ${data.status}\nAssignee: ${data.assignee || "Unassigned"}\nPriority: ${data.priority || "Normal"}\nDescription: ${data.description}\n${data.blockers && data.blockers.length > 0 ? `Blockers:\n${data.blockers.map((b: string) => `- ${b}`).join("\n")}` : ""}`;
 
       case "mcp://local-mcp-server/jira/projects":
       case "list_jira_projects": // backward compatibility
@@ -888,10 +1047,10 @@ ${data.activeSprints
 
         // Fallback: format raw project array
         if (Array.isArray(data)) {
-          return `**🏗️ Found ${data.length} Projects:**\n${data
+          return `Found ${data.length} Projects:\n${data
             .map(
               (project) =>
-                `• **${project.key}** - ${project.name}\n  📂 Type: ${project.projectTypeKey || "Unknown"}\n  📊 Category: ${project.category?.name || "None"}`,
+                `- ${project.key} - ${project.name}\n  Type: ${project.projectTypeKey || "Unknown"}\n  Category: ${project.category?.name || "None"}`,
             )
             .join("\n\n")}`;
         }
@@ -911,10 +1070,10 @@ ${data.activeSprints
 
         // Fallback: format raw board array
         if (Array.isArray(data)) {
-          return `**📋 Found ${data.length} Boards:**\n${data
+          return `Found ${data.length} Boards:\n${data
             .map(
               (board) =>
-                `• **${board.name}** (${board.type})\n  🎯 Active Sprints: ${board.activeSprints?.length || 0}\n  🏗️ Projects: ${board.projects?.length || 0}\n  ⚙️ Columns: ${board.config?.columns?.length || "Unknown"}`,
+                `- ${board.name} (${board.type})\n  Active Sprints: ${board.activeSprints?.length || 0}\n  Projects: ${board.projects?.length || 0}\n  Columns: ${board.config?.columns?.length || "Unknown"}`,
             )
             .join("\n\n")}`;
         }
@@ -934,10 +1093,10 @@ ${data.activeSprints
 
         // Fallback: format raw combined array
         if (Array.isArray(data)) {
-          return `**🏗️ Found ${data.length} Projects with Boards:**\n${data
+          return `Found ${data.length} Projects with Boards:\n${data
             .map(
               (item) =>
-                `• **${item.project.key}** - ${item.project.name}\n  📋 Boards: ${item.boards.length}\n  ${item.boards.map((b) => `    - ${b.name} (${b.type})`).join("\n  ")}`,
+                `- ${item.project.key} - ${item.project.name}\n  Boards: ${item.boards.length}\n  ${item.boards.map((b) => `    - ${b.name} (${b.type})`).join("\n  ")}`,
             )
             .join("\n\n")}`;
         }
@@ -955,14 +1114,14 @@ ${data.activeSprints
         const sources = data.sources || [];
         const metadata = data.search_metadata || {};
 
-        let formatted = `**Search Results**${metadata.query ? ` for "${metadata.query}"` : ""}:\n\n`;
+        let formatted = `Search Results${metadata.query ? ` for "${metadata.query}"` : ""}:\n\n`;
 
         if (searchContent) {
           formatted += `${searchContent}\n\n`;
         }
 
         if (sources.length > 0) {
-          formatted += `**Sources:**\n`;
+          formatted += `Sources:\n`;
           sources.slice(0, 5).forEach((source: any, index: number) => {
             formatted += `${index + 1}. [${source.name || source.title || "Source"}](${source.url})\n`;
           });
@@ -970,7 +1129,7 @@ ${data.activeSprints
         }
 
         if (citations.length > 0) {
-          formatted += `**Citations:**\n`;
+          formatted += `Citations:\n`;
           citations.slice(0, 3).forEach((citation: string, index: number) => {
             formatted += `${index + 1}. ${citation}\n`;
           });
@@ -986,16 +1145,16 @@ ${data.activeSprints
 
         if (data.project && data.epics) {
           const stats = data.stats || {};
-          let formatted = `**🌳 Project Tree: ${data.project}**\n\n`;
+          let formatted = `Project Tree: ${data.project}\n\n`;
 
-          formatted += `**📊 Project Statistics:**\n`;
-          formatted += `• **Epics:** ${stats.epics || 0}\n`;
-          formatted += `• **Issues:** ${stats.children || 0}\n`;
-          formatted += `• **Subtasks:** ${stats.subtasks || 0}\n`;
-          formatted += `• **Levels:** ${data.levels || 3}\n\n`;
+          formatted += `Project Statistics:\n`;
+          formatted += `- Epics: ${stats.epics || 0}\n`;
+          formatted += `- Issues: ${stats.children || 0}\n`;
+          formatted += `- Subtasks: ${stats.subtasks || 0}\n`;
+          formatted += `- Levels: ${data.levels || 3}\n\n`;
 
           if (data.epics && data.epics.length > 0) {
-            formatted += `**🎯 Epic Breakdown:**\n`;
+            formatted += `Epic Breakdown:\n`;
             data.epics.slice(0, 5).forEach((epic: any) => {
               const childCount = epic.children?.length || 0;
               const subtaskCount =
@@ -1005,12 +1164,12 @@ ${data.activeSprints
                   0,
                 ) || 0;
 
-              formatted += `• **${epic.key}** - ${epic.summary}\n`;
-              formatted += `  📊 Status: ${epic.status || "Unknown"}\n`;
-              formatted += `  👤 Assignee: ${epic.assignee || "Unassigned"}\n`;
-              formatted += `  📋 Issues: ${childCount} | Subtasks: ${subtaskCount}\n`;
+              formatted += `- ${epic.key} - ${epic.summary}\n`;
+              formatted += `  Status: ${epic.status || "Unknown"}\n`;
+              formatted += `  Assignee: ${epic.assignee || "Unassigned"}\n`;
+              formatted += `  Issues: ${childCount} | Subtasks: ${subtaskCount}\n`;
               if (epic.storyPoints) {
-                formatted += `  🎯 Story Points: ${epic.storyPoints}\n`;
+                formatted += `  Story Points: ${epic.storyPoints}\n`;
               }
               formatted += `\n`;
             });

@@ -150,7 +150,6 @@ app.post("/mcp", async (req, res) => {
 The `clone-gpt` application was configured to operate in forward-only mode:
 
 ```
-MCP_FORWARD_ONLY=1
 MCP_BASE_URL=http://127.0.0.1:4000
 ```
 

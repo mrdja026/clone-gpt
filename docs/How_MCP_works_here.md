@@ -6,14 +6,12 @@ Client: mcpClient calls our server over HTTP: GET /api/mcp/tools, POST /api/mcp/
 Server controller: /api/mcp/\* routes terminate in server/mcp/mcp.controller.ts → McpService.
 Server service: McpService.callRpc() operates in forward-only mode by default:
 
-## Default: Fixtures Adapter (MCP_USE_FIXTURES=1)
+## External MCP (Required)
 
-- Default mode: deterministic MCP over HTTP that returns pure JSON
-- No server-side tool endpoints beyond generic `/api/mcp/*`
-- Tools are implemented as fixtures for development and tests
-- Returns 3-level Jira project tree and basic ticket/sprint/project data
+- The app now requires an external MCP over HTTP and no longer supports fixtures.
+- Server-side tool endpoints are limited to generic `/api/mcp/*` proxying.
 
-## Forward-only Mode (Optional: MCP_FORWARD_ONLY=1)
+## MCP Forwarding
 
 - Requires `MCP_BASE_URL` pointing to an external MCP server
 - All calls are JSON-RPC to `<MCP_BASE_URL>/mcp`
@@ -34,7 +32,7 @@ Server service: McpService.callRpc() operates in forward-only mode by default:
 
    ```bash
    cd clone-gpt
-   MCP_FORWARD_ONLY=1 MCP_BASE_URL=http://127.0.0.1:4000 pnpm dev
+   MCP_BASE_URL=http://127.0.0.1:4000 pnpm dev
    ```
 
 3. The hello-world-mcp provides:
@@ -55,15 +53,11 @@ Example: Perplexity MCP server, custom tool servers, etc.
 
 ## Environment Configuration
 
-### clone-gpt (Fixtures mode default)
+### clone-gpt (External MCP required)
 
 ```bash
-# MCP Configuration (default fixtures)
-MCP_USE_FIXTURES=1                    # Enable fixtures adapter (default)
-
-# Forward-only example (optional)
-# MCP_FORWARD_ONLY=1
-# MCP_BASE_URL=http://127.0.0.1:4000
+# MCP Configuration (external MCP)
+MCP_BASE_URL=http://127.0.0.1:4000
 
 # Local LLM (independent of MCP)
 MODEL_NAME=qwen2                      # Local Ollama model
@@ -92,9 +86,9 @@ JIRA_API_TOKEN=your_jira_token
 cd hello-world-mcp
 MCP_HTTP_PORT=4000 npm start
 
-# Terminal 2: Start clone-gpt in fixtures mode (default)
+# Terminal 2: Start clone-gpt
 cd clone-gpt
-MCP_USE_FIXTURES=1 pnpm dev
+pnpm dev
 ```
 
 ### Test the integration:

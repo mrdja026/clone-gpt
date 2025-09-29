@@ -10,12 +10,11 @@ Goal: Identify and fix 401/405 errors when using MCP endpoints, verify fixture-b
 
 ### 1) Health + environment sanity
 
-- Start dev with fixtures: `pnpm dev:fixtures` (or `pnpm dev:fixtures:open`).
+- Start dev: `pnpm dev`.
 - `GET /api/healthz` and record:
-  - `MCP_USE_FIXTURES` value.
-- External MCP is optional. Prefer direct Jira adapter or fixtures. If you run an HTTP MCP, set `MCP_BASE_URL`.
+  - `MCP_BASE_URL` value.
   - Jira env presence flags: `JIRA_BASE_URL`, `JIRA_EMAIL`, `JIRA_API_TOKEN`.
-// JWT is not used for MCP; no Authorization header is needed.
+    // JWT is not used for MCP; no Authorization header is needed.
 
 ### 2) Reproduce with fixtures (expected to pass)
 
@@ -39,15 +38,15 @@ Goal: Identify and fix 401/405 errors when using MCP endpoints, verify fixture-b
 ### 4) If 401 occurs
 
 // No JWT layer is present; endpoints are open in dev.
+
 - For Jira (when fixtures off): 401 means missing/invalid Basic auth. Ensure:
   - `JIRA_BASE_URL=https://your-domain.atlassian.net`
   - `JIRA_EMAIL=you@domain.tld`
   - `JIRA_API_TOKEN=<token>` (personal API token)
 
-### 5) Switch to real Jira (optional, after fixtures are green)
+### 5) Switch to real Jira
 
-- Disable fixtures: unset `MCP_USE_FIXTURES`.
-- Keep the same cURL as in step 2 for `fetch_jira_ticket` but ensure Jira env vars are set.
+- Ensure your external MCP server is configured with Jira credentials.
 - Re-check `GET /api/healthz` to confirm presence of Jira envs.
 - Expected: 200 with real Jira issue fields; 401/403 indicates credential or project access problems.
 
@@ -106,13 +105,13 @@ Goal: Identify and fix 401/405 errors when using MCP endpoints, verify fixture-b
 
 ### How to Verify (WSL)
 
-1) Ensure `OPENAI_BASE_URL=http://127.0.0.1:11434/v1` and `MODEL_NAME=branko:latest` in `.env`.
-2) Free the port inside WSL if taken: `ss -ltnp | grep ':11434'` → `kill -9 <PID>`.
-3) On Windows, set `OLLAMA_HOST=0.0.0.0` and restart the Ollama service; open firewall for TCP 11434.
-4) Run app: `pnpm dev`.
+1. Ensure `OPENAI_BASE_URL=http://127.0.0.1:11434/v1` and `MODEL_NAME=branko:latest` in `.env`.
+2. Free the port inside WSL if taken: `ss -ltnp | grep ':11434'` → `kill -9 <PID>`.
+3. On Windows, set `OLLAMA_HOST=0.0.0.0` and restart the Ollama service; open firewall for TCP 11434.
+4. Run app: `pnpm dev`.
    - On startup, server prints when the proxy forwards 127.0.0.1 → Windows IP if the model is missing locally.
-5) Confirm models: `curl -s http://127.0.0.1:11434/v1/models | jq -r '.data[].id'` includes `branko:latest`.
-6) Exercise MCP and chat (fixtures first): `pnpm run check:mcp`, then use the UI with `SCRUM-8` and `current sprint`.
+5. Confirm models: `curl -s http://127.0.0.1:11434/v1/models | jq -r '.data[].id'` includes `branko:latest`.
+6. Exercise MCP and chat (fixtures first): `pnpm run check:mcp`, then use the UI with `SCRUM-8` and `current sprint`.
 
 ### Next Steps
 

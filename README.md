@@ -8,9 +8,9 @@ Operator Quickstart
   - `LANE_C_DIRECT_ANALYSIS=0` (raw‑first)
   - Lane A (Gemma): `OPENAI_BASE_URL=http://127.0.0.1:11434/api/generate`, `GEMMA_MODEL=gemma-fc-test:latest`
   - Lane C (Qwen): `OLLAMA_URL=http://127.0.0.1:124/api/chat`, `MODEL_NAME=qwen2.5:7b`
-  - MCP forward‑only: `MCP_FORWARD_ONLY=1`, `MCP_BASE_URL=http://127.0.0.1:4000` (or fixtures: `MCP_FORWARD_ONLY=0`, `MCP_USE_FIXTURES=1`)
-- Start: external MCP running on 4000 → `pnpm dev`; or fixtures → `pnpm dev:fixtures`.
-- Health: `GET http://localhost:3001/api/healthz` shows effective Ollama URL and MCP flags.
+  - MCP external: `MCP_BASE_URL=http://127.0.0.1:4000`
+- Start: external MCP running on 4000 → `pnpm dev`.
+- Health: `GET http://localhost:3001/api/healthz` shows effective Ollama URL and MCP base URL.
 - Raw‑first flow: ask `SCRUM-8` → RAW_DATA appears → reply "analyze that".
 
 Shell tests
@@ -102,9 +102,8 @@ The application will be available at `http://localhost:8080`
 
 ### End-to-End Tests
 
-- Run e2e (auto-starts dev with fixtures): `pnpm test:e2e`
-- Or run against an already started dev server: `pnpm dev:fixtures` then `pnpm test:e2e:noserver`
-- Specs live in `e2e/`, config in `playwright.config.ts`. Current suite is passing using fixtures.
+- Run e2e: `pnpm test:e2e`
+- Specs live in `e2e/`, config in `playwright.config.ts`.
 
 ### Perplexity Integration Tests
 
@@ -138,9 +137,8 @@ PERPLEXITY_API_KEY="pplx-your-key" ./scripts/test-perplexity.sh
 cd ../hello-world-mcp
 MCP_HTTP_PORT=4000 PERPLEXITY_API_KEY=pplx-your-key node src/server.js
 
-# 2. Start clone-gpt in forward-only mode
+# 2. Start clone-gpt
 cd ../clone-gpt
-export MCP_FORWARD_ONLY=1
 export MCP_BASE_URL=http://127.0.0.1:4000
 pnpm dev
 
@@ -246,8 +244,8 @@ $env:MCP_HTTP_PORT='4001'
 # Problem: Environment variables not persisting between commands
 # Solution: Set all variables before starting services
 
-# Set multiple variables at once
-$env:MCP_FORWARD_ONLY='1'; $env:MCP_BASE_URL='http://127.0.0.1:4001'; $env:PERPLEXITY_API_KEY='pplx-your-key'
+# Set MCP URL and optional Perplexity key
+$env:MCP_BASE_URL='http://127.0.0.1:4001'; $env:PERPLEXITY_API_KEY='pplx-your-key'
 
 # Or use .env file for persistence
 echo "MCP_BASE_URL=http://127.0.0.1:4001" >> .env
@@ -307,19 +305,11 @@ try {
 
 ## MCP (Model Context Protocol) Integration
 
-MCP exposes tools and resources for deterministic queries. This app uses a **forward-only architecture** by default:
+MCP exposes tools and resources for deterministic queries. This app now always uses an external MCP over HTTP:
 
-### Forward-only Mode (Default: MCP_FORWARD_ONLY=1)
-
-- **External MCP required**: Set `MCP_BASE_URL` to point to external MCP server
-- **Pure proxy**: All calls forwarded as JSON-RPC to `<MCP_BASE_URL>/mcp`
-- **Recommended**: Use with `hello-world-mcp` or other external MCP servers
-
-### Legacy Mode (Development: MCP_FORWARD_ONLY=0)
-
-- **Built-in adapters**: Direct Jira calls from server using `JIRA_*` envs
-- **Fixtures**: Set `MCP_USE_FIXTURES=1` for static test data from `server/fixtures/`
-- **External fallback**: Can still use `MCP_BASE_URL` if set
+- External MCP required: set `MCP_BASE_URL` to point to your MCP server
+- Pure proxy: all calls forwarded as JSON-RPC to `<MCP_BASE_URL>/mcp`
+- Recommended: use with `hello-world-mcp` HTTP bridge
 
 ### ✅ Quick Start with hello-world-mcp
 
@@ -336,7 +326,6 @@ node src/server.js
 **2. Configure clone-gpt (.env already set):**
 
 ```bash
-MCP_FORWARD_ONLY=1
 MCP_BASE_URL=http://127.0.0.1:4000
 MODEL_NAME=qwen2
 PERPLEXITY_API_KEY=pplx-your-api-key-here  # Optional: fallback for Perplexity
@@ -364,14 +353,7 @@ $body = '{"name":"fetch_perplexity_data","arguments":{"query":"what is the golde
 Invoke-WebRequest -Uri http://localhost:8080/api/mcp/tool -Method POST -Body $body -ContentType "application/json" -Headers @{"X-Perplexity-Key"="pplx-your-api-key-here"} -UseBasicParsing
 ```
 
-### Legacy verification (with built-in adapters):
-
-Set `MCP_FORWARD_ONLY=0` in .env, then:
-
-- Health: `curl -s http://localhost:3001/api/healthz | jq`
-- Tools: `curl -s http://localhost:3001/api/mcp/tools | jq`
-- Ticket: `curl -s -X POST http://localhost:3001/api/mcp/tool -H 'content-type: application/json' -d '{"name":"fetch_jira_ticket","arguments":{"ticketKey":"SCRUM-8"}}' | jq`
-- Jira sanity: `curl -i http://localhost:3001/api/jira/myself`
+<!-- Legacy fixture/adapter verification removed. -->
 
 Run tests:
 
@@ -738,7 +720,7 @@ These rules combine our internal `.cursor/rules/general.mdc` with the repo’s c
 
 **MCP Usage (JIRA Automation)**
 
-- MCP is used for supported deterministic queries. Communication is JSON‑RPC 2 over HTTP when `MCP_BASE_URL` is set, fixtures when `MCP_USE_FIXTURES=1`, or direct Jira calls by default. Stdio is not used.
+- MCP is used for supported deterministic queries. Communication is JSON‑RPC 2 over HTTP via the external MCP at `MCP_BASE_URL`. Stdio is not used.
 
 For more operational guidance, see `AGENTS.md`.
 
@@ -938,11 +920,9 @@ Example response structure:
 
 ### Quick Start with MCP
 
-Default modes:
+Default mode:
 
-- Direct Jira adapter: no extra setup; reads `JIRA_BASE_URL`, `JIRA_EMAIL`, `JIRA_API_TOKEN`.
-- Fixtures: set `MCP_USE_FIXTURES=1`.
-- External HTTP MCP (optional): set `MCP_BASE_URL` (e.g., `http://localhost:4000`).
+- External HTTP MCP: set `MCP_BASE_URL` (e.g., `http://localhost:4000`).
 
 ### API Endpoints
 
@@ -987,20 +967,7 @@ node scripts/test-jira-project-tree.js
 
 See [`docs/jira-project-tree-implementation.md`](docs/jira-project-tree-implementation.md) for detailed documentation.
 
-### Fixture/Internal Adapter Mode
-
-For deterministic local runs and CI, the server can serve MCP responses from fixtures without spawning an external MCP process. Enable fixtures:
-
-```
-MCP_USE_FIXTURES=1
-```
-
-With fixtures on, a minimal internal adapter is used (no spawn) that supports:
-
-- Tools: `process_text`, `fetch_jira_ticket`
-- Resources: `mcp://local-mcp-server/jira/projects`
-
-It reads Jira values from `JIRA_BASE_URL`, `JIRA_EMAIL`, `JIRA_API_TOKEN` when needed and returns MCP‑compatible response shapes, so the client/UI requires no changes. To use a real MCP via stdio instead, unset `MCP_USE_FIXTURES` and configure `MCP_SERVER_PATH`.
+<!-- Fixture/Internal Adapter Mode removed. Always use external MCP via MCP_BASE_URL. -->
 
 ## How It Works
 
@@ -1029,8 +996,7 @@ The MCP integration consists of these key files:
 
 ## E2E Tests
 
-- Run all: `pnpm test:e2e` (auto-starts Vite+Nest with fixtures enabled)
-- Or run against a manually started dev server: `pnpm dev:fixtures` then `pnpm test:e2e:noserver`
+- Run all: `pnpm test:e2e`
 - Specs live in `e2e/` and the config is `playwright.config.ts`.
 
 ## Example Response
@@ -1337,7 +1303,7 @@ curl -sS -X POST http://localhost:8080/api/mcp/tool \
 2. **Test MCP server independently:**
 
    ```bash
-   cd ../hello_world_mcp
+   cd ../hello-world-mcp
    node src/server.js
    ```
 
@@ -1467,10 +1433,10 @@ Successfully implemented a production-ready forward-only MCP architecture where 
 - **Authentication**: OAuth 2.0 + Basic Auth fallback for Jira
 - **Production Features**: Health monitoring, auto-restart, method normalization
 
-#### 2. **Clone-GPT Forward-Only Service**
+#### 2. **Clone-GPT MCP Service**
 
 - **Simplified MCP Service** (`server/mcp/mcp.service.ts`): Pure forwarding to external MCP
-- **Default Mode**: `MCP_FORWARD_ONLY=1` (89 lines vs. 1147 lines previously)
+- **External-only**: Requires `MCP_BASE_URL`
 - **Error Handling**: Clear messages when external MCP unavailable
 - **No Internal Logic**: All tool execution delegated to external server
 
@@ -1508,7 +1474,7 @@ Successfully implemented a production-ready forward-only MCP architecture where 
 ```
 ┌─────────────────┐    HTTP JSON-RPC     ┌──────────────────┐
 │   clone-gpt     │ ──────────────────► │ hello-world-mcp  │
-│ (Forward-only)  │    /mcp endpoint     │   (HTTP + STDIO) │
+│ (Forward-only)  │    /mcp endpoint     │  (HTTP Bridge)   │
 │ Port 8080       │                      │   Port 4000      │
 └─────────────────┘                      └──────────────────┘
           │                                        │
@@ -1551,8 +1517,8 @@ We've successfully implemented and verified the bare-bones MCP with HTTP bridge 
    - Validated header forwarding for per-request authentication
    - Verified CORS configuration for localhost development
 
-3. **Forward-Only Mode**:
-   - Configured `clone-gpt` with `MCP_FORWARD_ONLY=1` and `MCP_BASE_URL=http://127.0.0.1:4000`
+3. **External MCP**:
+   - Configured `clone-gpt` with `MCP_BASE_URL=http://127.0.0.1:4000`
    - Validated end-to-end tool listing and execution
    - Confirmed proper error handling and timeouts
 
@@ -1599,7 +1565,6 @@ The implementation is now production-ready with all components properly integrat
 #### clone-gpt (.env)
 
 ```bash
-MCP_FORWARD_ONLY=1                    # Default: forward-only mode
 MCP_BASE_URL=http://127.0.0.1:4000    # External MCP server endpoint
 MODEL_NAME=qwen2                      # Local Ollama model
 OPENAI_BASE_URL=http://127.0.0.1:11434/v1

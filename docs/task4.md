@@ -47,7 +47,7 @@ They are displayed on the Notion page as guidance and prefilled with example val
 
 ## Tests
 
-- Run all e2e: `pnpm test:e2e` (auto-starts the server) or `pnpm dev:fixtures` then `pnpm test:e2e:noserver`.
+- Run all e2e: `pnpm test:e2e` (auto-starts the server).
 - `e2e/providers.spec.ts` asserts:
   - Home shows the section and both provider entries.
   - Perplexity page opens and contains guidance text.

@@ -82,7 +82,7 @@ try {
 } catch {
     Write-Host "  clone-gpt is not running on port 8080 or forwarding failed" -ForegroundColor Red
     Write-Host "   Start with: pnpm dev" -ForegroundColor Yellow
-    Write-Host "   Ensure MCP_FORWARD_ONLY=1 and MCP_BASE_URL=http://127.0.0.1:4000" -ForegroundColor Yellow
+    Write-Host "   Ensure MCP_BASE_URL=http://127.0.0.1:4000" -ForegroundColor Yellow
     exit 1
 }
 

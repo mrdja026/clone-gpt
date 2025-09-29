@@ -105,9 +105,7 @@ Path aliases:
 
 ```bash
 pnpm dev                 # Start dev (Vite 8080 + Nest 3001)
-pnpm dev:fixtures       # Start dev with MCP fixtures enabled
 pnpm dev:logs           # Start dev and tee combined logs to logs/dev_*.log
-pnpm dev:fixtures:open  # Dev + auto-open browser + ready ping
 pnpm build              # Production build (client + server)
 pnpm start              # Start production server
 pnpm typecheck          # TypeScript validation
@@ -182,7 +180,7 @@ const data: MyRouteResponse = await response.json();
 - Production-ready with multiple deployment options
 - Comprehensive UI component library included
 - Type-safe API communication via shared interfaces
-- MCP integration: built-in adapters by default; optional fixtures via `MCP_USE_FIXTURES=1`. You can point to an external HTTP MCP with `MCP_BASE_URL` if needed.
+- MCP integration: external-only via `MCP_BASE_URL`.
 - use general.mdc for coding .cursor/rules/general.mdc
 
 ## CODING
@@ -201,16 +199,14 @@ Behave like my second brain. Work through the problem until you’d naturally st
 
 - WSL2 specifics (from session.md)
   - Dev proxy: Vite 8080 → Nest 3001. Ports must be free; use `ss -ltnp | rg ':3001|:8080'` to check conflicts.
-  - Auto-open helper: `pnpm dev:fixtures:open` (uses `scripts/open-on-ready.sh` to wait for the app and open a Windows browser via `wslview`/`cmd.exe`).
+  - Auto-open helper removed.
   - If localhost bridging fails, get the WSL IP and open `http://<WSL_IP>:<vite_port>`.
 
-- MCP fixtures and types
-  - Enable deterministic Jira responses with `MCP_USE_FIXTURES=1`.
-  - Fixture example: `server/fixtures/jira/SCRUM-8.json`; shared type: `shared/api.ts` (`JiraTicket`).
+- MCP fixtures removed. Use external MCP.
 
 - E2E reference (Playwright)
   - Config: `playwright.config.ts`. Specs: `e2e/home-smoke.spec.ts`, `e2e/mcp-scrum8.spec.ts`.
-  - Run: `pnpm test:e2e` (auto server) or `pnpm dev:fixtures` + `pnpm test:e2e:noserver`.
+  - Run: `pnpm test:e2e` (auto server).
 
   ## Upstash Agent
 

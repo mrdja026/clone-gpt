@@ -36,15 +36,46 @@ ${JSON.stringify(SUPPORTED_TOOLS, null, 2)}
   private queryMatcherFallback(userQuery: string): LaneBResult {
     const { JIRA_KEY, SPACE, USER } = QUERY_PATTERNS;
 
-    // Jira ticket pattern
+    const input = userQuery.toLowerCase();
+    const original = userQuery.trim();
+
+    // 1) JIRA ticket (e.g., SCRUM-42)
     if (JIRA_KEY.test(userQuery)) {
       const ticketKey = userQuery.match(JIRA_KEY)?.[0];
       if (ticketKey) {
         return {
+          tool_calls: [{ name: "fetch_ticket", arguments: { ticketKey } }],
+          source: "matcher",
+        };
+      }
+    }
+
+    // 2) Explicit project listings ("list/show/get all projects")
+    if (
+      /\b(list|show|get)\b.*\bprojects\b/.test(input) ||
+      /\ball\s+projects\b/.test(input)
+    ) {
+      return {
+        tool_calls: [
+          {
+            name: "search_jira_projects",
+            arguments: { status: "live", maxResults: 25 },
+          },
+        ],
+        source: "matcher",
+      };
+    }
+
+    // 3) Specific project lookup ("project WEB")
+    {
+      const m = original.match(/\bproject\s+([A-Za-z][A-Za-z0-9-]+)\b/);
+      if (m) {
+        const projectKey = m[1].toUpperCase();
+        return {
           tool_calls: [
             {
-              name: "fetch_ticket",
-              arguments: { ticketKey },
+              name: "search_jira_projects",
+              arguments: { query: projectKey, status: "live", maxResults: 10 },
             },
           ],
           source: "matcher",
@@ -52,33 +83,93 @@ ${JSON.stringify(SUPPORTED_TOOLS, null, 2)}
       }
     }
 
-    // Space pattern
+    // 4) Boards listing (global or for project)
+    if (/\b(list|show|get|find)\b.*\bboards\b/.test(input)) {
+      // Project-scoped boards: "boards in/for/of <KEY>"
+      const pm = original.match(
+        /\bboards?\s+(?:in|for|of)\s+([A-Za-z][A-Za-z0-9-]+)\b/i,
+      );
+      const args: Record<string, any> = {
+        includeConfig: true,
+        includeActiveSprints: true,
+        includeProjects: true,
+        maxResults: 10,
+      };
+      if (pm) args.projectKeyOrId = pm[1].toUpperCase();
+      return {
+        tool_calls: [{ name: "search_jira_boards", arguments: args }],
+        source: "matcher",
+      };
+    }
+
+    // 5) Projects with boards (combined)
+    if (/\bprojects?\b/.test(input) && /\bboards?\b/.test(input)) {
+      return {
+        tool_calls: [
+          {
+            name: "search_projects_with_boards",
+            arguments: { includeConfig: true, includeActiveSprints: true },
+          },
+        ],
+        source: "matcher",
+      };
+    }
+
+    // 6) Project tree <KEY>
+    {
+      const tm = original.match(
+        /\bproject\s+tree\s+([A-Za-z][A-Za-z0-9-]+)\b/i,
+      );
+      if (tm) {
+        const projectKeyOrId = tm[1].toUpperCase();
+        return {
+          tool_calls: [
+            {
+              name: "fetch_jira_project_tree",
+              arguments: { projectKeyOrId, pageSize: 100 },
+            },
+          ],
+          source: "matcher",
+        };
+      }
+    }
+
+    // 6b) List issues for project ("list all issues for <KEY>")
+    {
+      const im = original.match(
+        /\b(list|show|get)\b.*\bissues?\b.*\b(for|in|of)\b\s+([A-Za-z][A-Za-z0-9-]+)\b/i,
+      );
+      if (im) {
+        const projectKeyOrId = im[3].toUpperCase();
+        return {
+          tool_calls: [
+            {
+              name: "fetch_jira_project_tree",
+              arguments: { projectKeyOrId, pageSize: 200 },
+            },
+          ],
+          source: "matcher",
+        };
+      }
+    }
+
+    // 7) Perplexity space/user (existing patterns)
     if (SPACE.test(userQuery)) {
       const spaceId = userQuery.match(SPACE)?.[1];
       if (spaceId) {
         return {
           tool_calls: [
-            {
-              name: "fetch_perplexity_data",
-              arguments: { space_id: spaceId },
-            },
+            { name: "fetch_perplexity_data", arguments: { space_id: spaceId } },
           ],
           source: "matcher",
         };
       }
     }
-
-    // User pattern
     if (USER.test(userQuery)) {
       const user = userQuery.match(USER)?.[1];
       if (user) {
         return {
-          tool_calls: [
-            {
-              name: "fetch_perplexity_data",
-              arguments: { user },
-            },
-          ],
+          tool_calls: [{ name: "fetch_perplexity_data", arguments: { user } }],
           source: "matcher",
         };
       }

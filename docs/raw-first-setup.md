@@ -16,14 +16,8 @@ GEMMA_MODEL=gemma-fc-test:latest
 OLLAMA_URL=http://127.0.0.1:124/api/chat              # Qwen (Lane C)
 MODEL_NAME=qwen2.5:7b
 
-# MCP (choose one)
-# Fixtures/dev (default)
-MCP_FORWARD_ONLY=0
-MCP_USE_FIXTURES=1
-
-# Or Forward‑only HTTP MCP
-# MCP_FORWARD_ONLY=1
-# MCP_BASE_URL=http://127.0.0.1:4000
+# MCP External HTTP MCP
+MCP_BASE_URL=http://127.0.0.1:4000
 ```
 
 #### 2) Run models (addresses/ports)
@@ -40,8 +34,7 @@ qwen2.5:7b
 
 #### 3) Start the app
 
-- Fixtures mode: `pnpm dev:fixtures`
-- Forward‑only HTTP MCP: Start `hello-world-mcp` on `http://127.0.0.1:4000`, then `pnpm dev` here.
+- Start `hello-world-mcp` on `http://127.0.0.1:4000`, then `pnpm dev` here.
 
 #### 4) Validate
 
@@ -50,5 +43,5 @@ qwen2.5:7b
 
 Troubleshooting:
 
-- If you see `MCP is in forward-only mode...`, either set `MCP_FORWARD_ONLY=0` or provide `MCP_BASE_URL`.
+- Ensure `MCP_BASE_URL` is set to your MCP bridge URL.
 - If Ollama returns 404, ensure Lane A uses `/api/generate` and Lane C uses `/api/chat` on the right ports.

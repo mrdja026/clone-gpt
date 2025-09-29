@@ -64,9 +64,7 @@ onboarding flow…” with assignee “Jane Doe,” which you’ve identified as
 
 Two clean options:
 
-- Use live Jira for SCRUM-8
-  - Set MCP_USE_FIXTURES=0 in .env and restart pnpm dev.
-  - Then test: the server will call Jira directly and show the real data.
+- Use live Jira for SCRUM-8 via external MCP configured with Jira credentials.
 - Update the SCRUM-8 fixture to match Jira
   - I added a PowerShell script to fetch the real ticket and overwrite the fixture in the expected format.
 
@@ -85,5 +83,4 @@ Re-run tests after update
   - SCRUM-8 should reflect your live values
   - ABC-123 remains error path (for negative-case validation)
 
-If you’d rather keep fixtures off and always use live Jira for keys like SCRUM-8, set MCP_USE_FIXTURES=0 and you’re
-done. If you want, I can also add a small log line to server when a fixture is used so it’s obvious in the console.
+Use an external MCP configured with Jira credentials for live Jira data. Fixtures are removed.
