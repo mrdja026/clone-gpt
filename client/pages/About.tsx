@@ -2,7 +2,9 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { Moon, SunMedium } from "lucide-react";
-import AboutContent from "@/components/AboutContent";
+import AboutHero from "@/components/about/AboutHero";
+import ExperienceGrid from "@/components/about/ExperienceGrid";
+import WhyThisProject from "@/components/about/WhyThisProject";
 
 export default function About() {
   const [dark, setDark] = useState<boolean>(() =>
@@ -38,18 +40,23 @@ export default function About() {
               aria-label="Toggle theme"
               onClick={() => setTheme(!dark)}
             >
-              {dark ? <SunMedium className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              {dark ? (
+                <SunMedium className="h-4 w-4" />
+              ) : (
+                <Moon className="h-4 w-4" />
+              )}
             </Button>
           </nav>
         </div>
       </header>
 
       <main className="py-12 md:py-16">
-        <div className="container mx-auto px-4">
-          <AboutContent />
+        <div className="container mx-auto px-4 space-y-6 md:space-y-8">
+          <AboutHero />
+          <ExperienceGrid />
+          <WhyThisProject />
         </div>
       </main>
     </div>
   );
 }
-

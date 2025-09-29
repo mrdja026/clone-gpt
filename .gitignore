@@ -26,3 +26,7 @@ dist-ssr
 .config/
 .env
 .env.local
+.env.local.dev
+dev.out
+.env.backup
+

@@ -27,7 +27,6 @@ alwaysApply: true
 - Adhere to KISS principle
 - Adhere to YAGNI principles
 - After every fix and impementation give commands to test the full solution
-- DO NOT USE EMOJIES IN LOGS
 
 # Implementation rules
 
@@ -35,14 +34,10 @@ alwaysApply: true
 - If not the component must be created there in a subfolder for that component
 - That componet must follwo the styleguide and be aware of the theme changes
 
-# IGNORE C:\Users\Mrdjan\Documents\workspace\clone-gpt\hello_world_mcp project
+# MCP Guidelines
 
-# MCP MUST BE USED
-
-- MPC USES STDIO COMMUNICATION AND JSONRPC2 to get send data
-- hello_world_mcp C:\Users\Mrdjan\Documents\workspace\hello_world_mpc must be used
-- contains the logic that creates barebones mcp C:\Users\Mrdjan\Documents\workspace\hello_world_mpc\src\server.js
-- packages are in C:\Users\Mrdjan\Documents\workspace\hello_world_mpc\package.json
+- Prefer built-in adapters and fixtures for local dev.
+- If using an external MCP, prefer HTTP via `MCP_BASE_URL`. Avoid stdio.
 
 # RULES DO NOT DEVIATE FROM THIS
 

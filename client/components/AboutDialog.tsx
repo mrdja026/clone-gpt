@@ -1,4 +1,10 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import AboutContent from "@/components/AboutContent";
 import React from "react";
 
@@ -21,4 +27,3 @@ export default function AboutDialog({
     </Dialog>
   );
 }
-

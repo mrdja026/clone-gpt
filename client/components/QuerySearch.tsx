@@ -20,7 +20,7 @@ interface QuerySearchProps {
 export function QuerySearch({
   queries,
   onSelect,
-  placeholder = "Search queries (Cmd/Ctrl+K)...",
+  placeholder = "Try: 'SCRUM-8', 'project WEB tree', 'search boards', or 'latest React features'...",
   className,
 }: QuerySearchProps) {
   const [open, setOpen] = useState(true);
@@ -56,13 +56,13 @@ export function QuerySearch({
 
   return (
     <div className={cn("w-full", className)}>
-      <Command className="rounded-2xl border bg-card/60 backdrop-blur ring-1 ring-border shadow-sm p-2 md:p-3">
+      <Command className="rounded-3xl border bg-card/70 backdrop-blur-md ring-1 ring-border/60 shadow-md p-3 md:p-4">
         <CommandInput
           ref={inputRef}
           value={value}
           onValueChange={setValue}
           placeholder={placeholder}
-          className="h-14 text-base"
+          className="h-16 text-lg rounded-2xl"
         />
         <CommandList className={cn(!open && "hidden", "max-h-[420px]")}>
           <CommandEmpty>No matching queries.</CommandEmpty>
