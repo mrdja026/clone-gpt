@@ -1,6 +1,44 @@
-# Clone GPT - AI Chat Application
+## Clone GPT — MCP Raw JSON First, Then Chat
 
-A production-ready ChatGPT-like application built with React, NestJS, and AI SDK, featuring branching conversations and support for both OpenAI and local Ollama models.
+This app is optimized to: 1) fetch structured data from MCP (e.g., Jira) and return it as RAW_DATA JSON first, 2) on your follow‑up (e.g., "analyze that"), produce an explanation grounded on that JSON.
+
+Operator Quickstart
+
+- Minimal env (see `env.example`):
+  - `LANE_C_DIRECT_ANALYSIS=0` (raw‑first)
+  - Lane A (Gemma): `OPENAI_BASE_URL=http://127.0.0.1:11434/api/generate`, `GEMMA_MODEL=gemma-fc-test:latest`
+  - Lane C (Qwen): `OLLAMA_URL=http://127.0.0.1:124/api/chat`, `MODEL_NAME=qwen2.5:7b`
+  - MCP forward‑only: `MCP_FORWARD_ONLY=1`, `MCP_BASE_URL=http://127.0.0.1:4000` (or fixtures: `MCP_FORWARD_ONLY=0`, `MCP_USE_FIXTURES=1`)
+- Start: external MCP running on 4000 → `pnpm dev`; or fixtures → `pnpm dev:fixtures`.
+- Health: `GET http://localhost:3001/api/healthz` shows effective Ollama URL and MCP flags.
+- Raw‑first flow: ask `SCRUM-8` → RAW_DATA appears → reply "analyze that".
+
+Shell tests
+
+PowerShell (Windows):
+
+```powershell
+# Health (effectiveBaseUrl + MCP flags)
+Invoke-RestMethod -Uri "http://localhost:3001/api/healthz" | ConvertTo-Json -Depth 6
+
+# RAW first
+$b = '{"query":"SCRUM-8"}'
+Invoke-WebRequest -Uri http://localhost:3001/api/chat/third-lane/simple -Method POST -ContentType 'application/json' -Body $b | Select-Object -ExpandProperty Content
+
+# Then analysis
+$b2 = '{"query":"Analyze that data"}'
+Invoke-WebRequest -Uri http://localhost:3001/api/chat/third-lane/simple -Method POST -ContentType 'application/json' -Body $b2 | Select-Object -ExpandProperty Content
+```
+
+Bash (macOS/Linux/WSL):
+
+```bash
+curl -s http://localhost:3001/api/healthz | jq
+curl -s -X POST http://localhost:3001/api/chat/third-lane/simple -H 'Content-Type: application/json' -d '{"query":"SCRUM-8"}' | jq -r .
+curl -s -X POST http://localhost:3001/api/chat/third-lane/simple -H 'Content-Type: application/json' -d '{"query":"Analyze that data"}' | jq -r .
+```
+
+More: `docs/raw-first-setup.md`.
 
 ## Features
 
