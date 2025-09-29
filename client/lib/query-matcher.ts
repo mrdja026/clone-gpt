@@ -75,7 +75,14 @@ function extractProjectIds(text: string): string[] {
     while ((match = pattern.exec(text)) !== null) {
       const projectKey = match[1];
       // Validate it looks like a project key (2+ chars, starts with letter)
-      if (projectKey.length >= 2 && /^[A-Z]/.test(projectKey)) {
+      if (
+        projectKey.length >= 2 &&
+        /^[A-Z]/.test(projectKey) &&
+        projectKey.toUpperCase() !== "TREE" &&
+        projectKey.toUpperCase() !== "PROJECT" &&
+        projectKey.toUpperCase() !== "BOARDS" &&
+        projectKey.toUpperCase() !== "ISSUES"
+      ) {
         matches.add(projectKey);
       }
     }
@@ -296,6 +303,53 @@ function laneBEnhancedFallback(userInput: string): QueryMatch | null {
 export function matchQuery(userInput: string): QueryMatch {
   const input = userInput.toLowerCase().trim();
   const originalInput = userInput.trim();
+
+  // Top-priority: explicit project tree and issues-for-project intents
+  {
+    const m = originalInput.match(
+      /\bproject\s+tree\s+([A-Za-z][A-Za-z0-9-]+)\b/i,
+    );
+    if (m) {
+      const projectKeyOrId = m[1].toUpperCase();
+      return {
+        isMatch: true,
+        confidence: 0.99,
+        originalQuery: userInput,
+        mcpActions: [
+          {
+            toolName: "fetch_jira_project_tree",
+            args: { projectKeyOrId, pageSize: 200 },
+            description: `Fetching project tree for ${projectKeyOrId}`,
+            type: "tool",
+          },
+        ],
+        enhancedPrompt: `From the project tree for ${projectKeyOrId}, provide a compact overview and list issues.`,
+      };
+    }
+  }
+
+  {
+    const m = originalInput.match(
+      /\b(list|show|get)\b.*\bissues?\b.*\b(for|in|of)\b\s+([A-Za-z][A-Za-z0-9-]+)\b/i,
+    );
+    if (m) {
+      const projectKeyOrId = m[3].toUpperCase();
+      return {
+        isMatch: true,
+        confidence: 0.98,
+        originalQuery: userInput,
+        mcpActions: [
+          {
+            toolName: "fetch_jira_project_tree",
+            args: { projectKeyOrId, pageSize: 200 },
+            description: `Fetching issues (tree) for ${projectKeyOrId}`,
+            type: "tool",
+          },
+        ],
+        enhancedPrompt: `From the project tree for ${projectKeyOrId}, list the issues with key details.`,
+      };
+    }
+  }
 
   // High-confidence explicit intents
   if (

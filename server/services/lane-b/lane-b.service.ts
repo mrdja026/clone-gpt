@@ -66,9 +66,11 @@ ${JSON.stringify(SUPPORTED_TOOLS, null, 2)}
       };
     }
 
-    // 3) Specific project lookup ("project WEB")
+    // 3) Specific project lookup ("project WEB") — avoid matching "project tree <KEY>"
     {
-      const m = original.match(/\bproject\s+([A-Za-z][A-Za-z0-9-]+)\b/);
+      const m = original.match(
+        /\bproject\s+(?!tree\b)([A-Za-z][A-Za-z0-9-]+)\b/,
+      );
       if (m) {
         const projectKey = m[1].toUpperCase();
         return {
